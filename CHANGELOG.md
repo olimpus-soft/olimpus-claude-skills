@@ -9,6 +9,10 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [1.1.0] - 2026-06-03
 
+### Fixed
+
+- **[OLIMPUSSW-404 hotfix] `marketplace.json` — agregar campo `owner` requerido por Claude Code Action:** el action `claude-code-action@v1` (input `plugin_marketplaces`) rechaza el marketplace con error `Failed to parse marketplace.json: owner: Invalid input: expected object, received undefined`. Schema oficial de [Claude Code plugins](https://docs.claude.com/en/docs/claude-code/plugins#marketplace-json) requiere `owner` como objeto con `name`, `email` y `url`. Sin este campo, el plugin `pr-review-toolkit` NO se instala en CI cross-repo (12 repos OlimpusSoft impactados). Detectado empíricamente por levi en validación Plan B del PR `olimpus-streamvault#179`. Bloqueante criterio-1 del rollout 3.0.
+
 ### Changed
 
 - **[OLIMPUSSW-404] skill `pr-generate` — quitar triggers `@claude review` y `@codex review`:** se elimina del Paso 6 la publicación de comentarios que disparan los reviews de Claude y Codex. Razón: ahora los workflows del repo (`claude.yml` y `codex-review-gate.yml`) disparan ambos reviews **automáticamente post-CI verde**, lo que evita revisiones sobre código que aún no compila/pasa tests y elimina redundancia. La skill ahora solo asigna `copilot` como reviewer humano-equivalente. Actualizado descripción del frontmatter, Paso 6 (renombrado a "Asignar reviewer (copilot)"), Paso 7 (resumen final), y tabla de estándares de calidad.
