@@ -1,6 +1,6 @@
 ---
 name: pr-generate
-description: "Genera y crea Pull Requests automáticamente sin pedir confirmación. Analiza el diff, construye título y body, crea el PR en Draft, asigna copilot como reviewer y dispara el review de Claude. Flujo 100% autónomo — nunca pausa ni pregunta al usuario."
+description: "Genera y crea Pull Requests automáticamente sin pedir confirmación. Analiza el diff, construye título y body, crea el PR en Draft y asigna copilot como reviewer. Los reviews automáticos de Claude y Codex se disparan vía workflows del repo post-CI verde — la skill ya no los menciona en comentarios. Flujo 100% autónomo — nunca pausa ni pregunta al usuario."
 allowlist:
   - git
   - gh
@@ -93,8 +93,20 @@ git diff ${TARGET_BRANCH}...${CURRENT_BRANCH}
 | Cualquier otro | `develop` |
 
 Extraer del branch:
-- **Tipo CC** según prefijo: `feature/` → `feat`, `fix/` → `fix`, `hotfix/` → `hotfix`, `bugfix/` → `fix`, `chore/` → `chore`, `docs/` → `docs`, `refactor/` → `refactor`, `test/` → `test`, `release/` → `release`, sin prefijo → `feat`
-- **Ticket ID** — patrón `OLIMPUSSW-\d+` en el nombre del branch
+- **Tipo CC** según prefijo del branch, mapeando a uno de los **9 tipos válidos** del validator `amannn/action-semantic-pull-request@v6`: `feat | fix | chore | docs | refactor | test | ci | build | perf`.
+  - `feature/` → `feat`
+  - `fix/` → `fix`
+  - `bugfix/` → `fix`
+  - `hotfix/` → `fix` ⚠️ **NO** usar `hotfix` (no es tipo CC válido — falla el validator)
+  - `chore/` → `chore`
+  - `docs/` → `docs`
+  - `refactor/` → `refactor`
+  - `test/` → `test`
+  - `release/` → `chore` ⚠️ **NO** usar `release` (no es tipo CC válido)
+  - Branches CI/build (`ci/`, `build/`) → `ci` o `build` respectivamente
+  - Branches de optimización (`perf/`) → `perf`
+  - Sin prefijo o cualquier otro → `feat`
+- **Ticket ID** — patrón `OLIMPUSSW-\d+` en el nombre del branch (se usa como `scope` cuando aplique)
 
 ---
 
@@ -119,28 +131,59 @@ Tests: ejecutar `make test` si existe Makefile con target `test`. Si no existe, 
 
 ## Paso 3: Construir título
 
-**Formato obligatorio:**
+**Formato obligatorio** — alineado con el validator `amannn/action-semantic-pull-request@v6` (configurado en `pr-checks.yml` de los repos OlimpusSoft):
+
 ```
-{type}({scope}): {descripción mínimo 10 chars}
+type: description
+type(scope): description
 ```
 
-- Máximo **120 caracteres** totales
-- Una sola línea
-- Verbos en infinitivo: Agregar, Corregir, Refactorizar, Actualizar, Eliminar, Implementar, Ajustar, Migrar
-- Sin artículos innecesarios
-- Una sola acción principal — la de mayor impacto en lógica de negocio
+**Reglas obligatorias del validator** (el CI rechaza el PR si no se cumplen):
+
+1. **Tipo** — solo uno de estos 9: `feat | fix | chore | docs | refactor | test | ci | build | perf`. Nada más. `hotfix`, `release`, `bugfix` **no son válidos** — se mapean a `fix` o `chore` (ver Paso 1).
+2. **Scope** — opcional (`requireScope: false`). **Cuando aplique**, usar el ticket Jira: `OLIMPUSSW-N`. Entre paréntesis, sin espacios: `chore(OLIMPUSSW-396)`.
+3. **Separador** — siempre `: ` (dos puntos + espacio único) entre `type[(scope)]` y la descripción.
+4. **Description** — comienza en **minúscula** inmediatamente tras `: `. **Sin punto final.** Sin mayúscula inicial.
+5. **Longitud** — máximo **120 caracteres** totales (límite GitHub).
+6. **Una sola línea**, sin saltos.
+
+**Reglas de redacción de la descripción:**
+
+- Verbos en **infinitivo en minúscula**: `agregar`, `corregir`, `refactorizar`, `actualizar`, `eliminar`, `implementar`, `ajustar`, `migrar`, `reemplazar`.
+- Sin artículos innecesarios (`el`, `la`, `un`).
+- Una sola acción principal — la de mayor impacto en lógica de negocio.
+- Específico para entenderse sin contexto adicional.
 
 **Auto-crítica interna antes de escribir:**
-- ¿Describe el impacto real, no el medio? (malo: "modificar archivo X" / bueno: "corregir cálculo impuestos en checkout")
-- ¿El tipo CC es honesto y preciso?
-- ¿Tiene suficiente especificidad para entenderse sin contexto adicional?
 
-**Ejemplos:**
+- ¿Empieza con minúscula tras `: `? ¿Sin punto final?
+- ¿El tipo es uno de los 9 válidos? (no `hotfix`, no `release`, no `bugfix` directo)
+- ¿Describe el impacto real, no el medio? (mal: "modificar archivo X" / bien: "corregir cálculo impuestos en checkout")
+- ¿El tipo CC es honesto y preciso?
+- ¿Tiene scope `OLIMPUSSW-N` cuando hay ticket Jira asociado?
+
+**Ejemplos válidos:**
+
 ```
 feat(OLIMPUSSW-42): implementar validación email en formulario registro usuarios
 fix(OLIMPUSSW-77): corregir rotación de refresh token con sesión expirada
-hotfix(OLIMPUSSW-99): resolver falla crítica autenticación usuarios premium
+fix(OLIMPUSSW-99): resolver falla crítica autenticación usuarios premium
 chore(OLIMPUSSW-12): actualizar dependencias testing y configuración CI/CD
+chore(OLIMPUSSW-396): reemplazar trigger @codex review por prompt canónico maracucho
+ci(OLIMPUSSW-383): agregar concurrency cancel-in-progress a workflows
+docs: corregir typo en sección de troubleshooting
+refactor(OLIMPUSSW-201): extraer lógica paginación a hook reutilizable
+```
+
+**Ejemplos inválidos** (los rechaza el validator — **no usar**):
+
+```
+❌ [OLIMPUSSW-42] Implementar validación email                  → falta type CC
+❌ Feature: implementar X                                       → tipo no válido
+❌ hotfix(OLIMPUSSW-99): resolver falla crítica                 → "hotfix" no es tipo válido (usar "fix")
+❌ release/OLIMPUSSW-sprint-3: changelog                        → "release" no es tipo válido (usar "chore")
+❌ feat(OLIMPUSSW-42): Implementar validación email.           → mayúscula inicial + punto final
+❌ chore(OLIMPUSSW-12):actualizar deps                         → falta espacio tras `:`
 ```
 
 ---
@@ -205,7 +248,7 @@ PR_NUMBER=$(echo "${PR_URL}" | grep -oE '[0-9]+$')
 
 ---
 
-## Paso 6: Asignar reviewers y disparar reviews (Claude + Codex)
+## Paso 6: Asignar reviewer (copilot)
 
 ```bash
 for i in 1 2 3 4 5; do
@@ -213,13 +256,9 @@ for i in 1 2 3 4 5; do
   echo "Intento $i fallido, reintentando en 30s..."
   sleep 30
 done
-
-gh pr comment ${PR_NUMBER} --body "@claude review this PR"
-
-# Codex como reviewer — SIEMPRE. El PR se crea en Draft y Codex no revisa drafts
-# automáticamente, por eso se dispara explícito con la mención.
-gh pr comment ${PR_NUMBER} --body "@codex review"
 ```
+
+> **Nota:** Los reviews automáticos de Claude (`@claude review`) y Codex (`@codex review`) **ya no se disparan desde la skill**. Ahora los disparan los workflows del repo (`claude.yml` y `codex-review-gate.yml`) automáticamente **post-CI verde**, evitando ejecutar revisiones sobre código que aún no compila/pasa tests. La skill solo asigna `copilot` como reviewer humano-equivalente.
 
 ---
 
@@ -239,9 +278,8 @@ gh pr comment ${PR_NUMBER} --body "🔗 **Jira:** https://olimpus-soft.atlassian
 ✅ PR #N creado en Draft: {PR_URL}
 ✅ Título: {PR_TITLE}
 ✅ copilot asignado como reviewer
-✅ @claude review disparado
-✅ @codex review disparado
 ✅ Jira link publicado (si aplica)
+ℹ️ Reviews automáticos de @claude y @codex se dispararán por los workflows del repo cuando CI termine en verde.
 ```
 
 ---
@@ -253,6 +291,7 @@ gh pr comment ${PR_NUMBER} --body "🔗 **Jira:** https://olimpus-soft.atlassian
 | Cobertura | ≥ 98% (advertencia si no) |
 | Archivos | ≤ 20 por PR (bloqueante) |
 | CHANGELOG.md | Actualizado (bloqueante) |
-| Título | Conventional Commits, máx 120 chars |
+| Título | Conventional Commits estricto (`amannn/action-semantic-pull-request@v6`): `type[(scope)]: description` — 9 tipos válidos, description en minúscula sin punto final, máx 120 chars |
 | Estado | Siempre Draft |
+| Reviewers | Solo `copilot` asignado por la skill — `@claude` y `@codex` se disparan por los workflows del repo post-CI verde |
 | Firmas | Solo `Generated by Claude Code` + `Co-authored-by:` |
