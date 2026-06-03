@@ -7,8 +7,9 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-02
+
 ### Added
-### Changed
-### Fixed
-### Removed
-### Security
+- Plugin `pr-review-toolkit` con 13 skills: `pr-review`, `quality-test`, `pr-comments-resolver`, `pr-generate`, `commitmsg`, `review-py`, `review-frontend`, `review-go`, `review-java`, `arch-py`, `arch-frontend`, `arch-go`, `arch-java`
+- Estructura de plugin marketplace estándar de Claude Code
+- README con catálogo de skills y ejemplo de integración en `claude.yml`

@@ -1,0 +1,24 @@
+{
+  "name": "pr-review-toolkit",
+  "description": "Toolkit completo de review de PRs para OlimpusSoft: análisis exhaustivo, calidad de tests, resolución de comentarios, generación de descripciones y guías de arquitectura por stack (Python, Frontend, Go, Java)",
+  "version": "1.0.0",
+  "author": {
+    "name": "OlimpusSoft",
+    "email": "miguelmoralescoterio@gmail.com"
+  },
+  "skills": [
+    "pr-review",
+    "quality-test",
+    "pr-comments-resolver",
+    "pr-generate",
+    "commitmsg",
+    "review-py",
+    "review-frontend",
+    "review-go",
+    "review-java",
+    "arch-py",
+    "arch-frontend",
+    "arch-go",
+    "arch-java"
+  ]
+}

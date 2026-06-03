@@ -1,71 +1,58 @@
-# {PROJECT_NAME}
+# olimpus-claude-skills
 
-> {Descripción corta del proyecto — qué hace y para qué existe}
+[![claude-code-plugin](https://img.shields.io/badge/claude--code-plugin-blueviolet)](https://github.com/olimpus-soft/olimpus-claude-skills)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
 
-[![CI](https://github.com/olimpus-soft/{PROJECT_NAME}/actions/workflows/ci.yml/badge.svg)](https://github.com/olimpus-soft/{PROJECT_NAME}/actions/workflows/ci.yml)
-[![Coverage](https://codecov.io/gh/olimpus-soft/{PROJECT_NAME}/branch/main/graph/badge.svg)](https://codecov.io/gh/olimpus-soft/{PROJECT_NAME})
-[![License](https://img.shields.io/badge/license-Propietario-red.svg)](LICENSE.txt)
-[![Confidential](https://img.shields.io/badge/acceso-privado%20y%20confidencial-critical.svg)](LEGAL.md)
+Plugin marketplace de Claude Code de OlimpusSoft — 13 skills para review exhaustivo de PRs, análisis de calidad de tests y guías de arquitectura por stack.
 
-## Descripción
+## Instalación
 
-<!-- Explicar el problema que resuelve, el contexto de negocio y los usuarios objetivo -->
-
-## Documentación
-
-- [Guía completa](docs/guide/) — arquitectura, flujos, diagramas
-- [API Reference](docs/swagger/) — Swagger / OpenAPI
-- [Changelog](CHANGELOG.md)
-- [Contribuir](CONTRIBUTING.md)
-- [Deployment](DEPLOYMENT.md)
-- [Seguridad](SECURITY.md)
-
-## Inicio rápido
-
-```bash
-# 1. Clonar
-git clone https://github.com/olimpus-soft/{PROJECT_NAME}.git
-cd {PROJECT_NAME}
-
-# 2. Copiar variables de entorno
-cp .env.example .env
-# Editar .env con los valores correspondientes
-
-# 3. Levantar infraestructura y correr la app
-make setup
-make dev
+```
+/plugin marketplace add olimpus-soft/olimpus-claude-skills
+/plugin install pr-review-toolkit@latest
 ```
 
-## Comandos principales
+## Plugins disponibles
 
-| Comando | Descripción |
+### pr-review-toolkit
+
+| Skill | Descripción |
 |---|---|
-| `make dev` | Levantar servidor en modo desarrollo |
-| `make test` | Ejecutar tests con cobertura |
-| `make lint` | Verificar estilo de código |
-| `make format` | Formatear código |
-| `make build` | Construir imagen Docker |
+| `/pr-review` | Análisis exhaustivo de PR con veredicto formal (APROBADO / CAMBIOS REQUERIDOS / RECHAZADO) y comentarios inline en GitHub |
+| `/quality-test` | Auditoría de calidad de tests: smells, cobertura, mutación readiness, edge cases |
+| `/pr-comments-resolver` | Clasifica y resuelve comentarios activos de PR (fix de código o respuesta) |
+| `/pr-generate` | Genera descripción completa del PR lista para publicar en GitHub |
+| `/commitmsg` | Genera mensaje de commit en formato OlimpusSoft con tipo, ticket Jira y co-autor del modelo |
+| `/review-py` | Checklist de revisión específico para Python: ruff, mypy, FastAPI, pydantic, async |
+| `/review-frontend` | Checklist para TypeScript/React: hooks, accesibilidad, bundle size, performance |
+| `/review-go` | Checklist para Go: error handling, goroutines, interfaces, testing |
+| `/review-java` | Checklist para Java/Spring Boot: SOLID, inyección, transacciones, excepciones |
+| `/arch-py` | Patrones de arquitectura Python: hexagonal, ports & adapters, DDD, async |
+| `/arch-frontend` | Patrones frontend: componentes, estado, routing, design system |
+| `/arch-go` | Patrones Go: clean architecture, handlers, middlewares, repositories |
+| `/arch-java` | Patrones Java: hexagonal, Spring layers, aggregate roots, eventos de dominio |
 
-Ver todos los comandos disponibles: `make help`
+## Uso en CI — `claude.yml`
 
-## Stack
+```yaml
+- uses: anthropics/claude-code-action@v1
+  with:
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    model: claude-opus-4-7
+    prompt: |
+      /plugin marketplace add olimpus-soft/olimpus-claude-skills
+      /plugin install pr-review-toolkit@latest
+      /pr-review ${{ github.repository }}#${{ github.event.pull_request.number }}
+      /quality-test
+    claude_args: |
+      --effort high
+      --append-system-prompt "Responde en español colombiano neutro. Aplica reglas del repo (CLAUDE.md + AGENTS.md). Prioriza seguridad. Cierra con /pr-comments-resolver y/o Paso 6 desbloqueo del pr-review."
+    allowed_tools: "Bash,Read,Write,Edit,Grep,Glob,Skill"
+  env:
+    GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_READ_TOKEN }}
+```
 
-<!-- Completar al inicializar el proyecto -->
-- **Lenguaje:** `TODO`
-- **Framework:** `TODO`
-- **Base de datos:** `TODO`
-- **Cache:** `TODO`
+## Changelog
 
-## Requisitos
-
-- Docker >= 24
-- Docker Compose >= 2.20
-- `<!-- TODO: agregar requisitos específicos del stack -->`
-
-## Licencia y Propiedad Intelectual
-
-**Software privado y confidencial. Todos los derechos reservados.**
-Copyright © 2026 Olimpus Soft SAS — Miguel Ángel Morales Coterio.
-
-El uso de este software requiere contrato escrito con Olimpus Soft SAS.
-Ver [LICENSE.txt](LICENSE.txt) y [LEGAL.md](LEGAL.md) para los términos completos.
+Ver [CHANGELOG.md](CHANGELOG.md).
