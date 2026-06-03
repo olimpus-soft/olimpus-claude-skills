@@ -11,6 +11,8 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **[OLIMPUSSW-404 sync] `.release-please-manifest.json` — sincronizar con versión publicada manualmente (1.1.0):** el manifest estaba en `0.1.0` mientras `marketplace.json` y `plugin.json` ya estaban en `1.0.0` (drift previo a este PR). Al subir manualmente a `1.1.0`, se sincroniza el manifest para evitar que release-please genere PRs con bump partiendo de `0.1.0` y desalineados con el versionado real del marketplace. Detectado por codex[bot] en review del PR#2.
+
 - **[OLIMPUSSW-404 hotfix] `marketplace.json` — agregar campo `owner` requerido por Claude Code Action:** el action `claude-code-action@v1` (input `plugin_marketplaces`) rechaza el marketplace con error `Failed to parse marketplace.json: owner: Invalid input: expected object, received undefined`. Schema oficial de [Claude Code plugins](https://docs.claude.com/en/docs/claude-code/plugins#marketplace-json) requiere `owner` como objeto con `name`, `email` y `url`. Sin este campo, el plugin `pr-review-toolkit` NO se instala en CI cross-repo (12 repos OlimpusSoft impactados). Detectado empíricamente por levi en validación Plan B del PR `olimpus-streamvault#179`. Bloqueante criterio-1 del rollout 3.0.
 
 ### Changed
