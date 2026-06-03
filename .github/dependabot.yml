@@ -1,0 +1,39 @@
+version: 2
+updates:
+  # TODO: Descomentar y ajustar el ecosystem según el stack del proyecto
+  # Python
+  # - package-ecosystem: "pip"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   groups:
+  #     all-python-deps:
+  #       patterns: ["*"]
+
+  # Go
+  # - package-ecosystem: "gomod"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   groups:
+  #     all-go-deps:
+  #       patterns: ["*"]
+
+  # Node
+  # - package-ecosystem: "npm"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   groups:
+  #     all-npm-deps:
+  #       patterns: ["*"]
+
+  # GitHub Actions — siempre activo
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

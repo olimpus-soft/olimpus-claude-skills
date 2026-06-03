@@ -1,0 +1,70 @@
+name: Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 8 * * 1'
+
+jobs:
+  # ── Escaneo de código fuente ──────────────────────────────────────────────
+  sast:
+    name: SAST — Análisis de código fuente
+    runs-on: [self-hosted, linux, x64, vps]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # TODO: Descomentar y configurar según el stack del proyecto
+
+      # Python — Bandit
+      # - name: Install Bandit
+      #   run: pip install bandit[toml]
+      # - name: Run Bandit
+      #   run: bandit -r src/ -ll -ii --format json --output bandit-report.json || true
+      # - name: Check Bandit results
+      #   run: |
+      #     python -c "
+      #     import json, sys
+      #     r = json.load(open('bandit-report.json'))
+      #     highs = [i for i in r['results'] if i['issue_severity'] in ('HIGH','CRITICAL')]
+      #     for i in highs: print(f\"{i['filename']}:{i['line_number']} {i['issue_text']}\")
+      #     sys.exit(1 if highs else 0)
+      #     "
+
+      # Go — gosec
+      # - name: Run gosec
+      #   uses: securego/gosec@master
+      #   with:
+      #     args: ./...
+
+      # Node — audit
+      # - name: npm audit
+      #   run: npm audit --audit-level=high
+
+      - name: Placeholder SAST
+        run: echo "→ Configurar SAST según el stack del proyecto"
+
+  # ── Escaneo de contenedor ─────────────────────────────────────────────────
+  trivy:
+    name: Trivy — Container Security Scan
+    runs-on: [self-hosted, linux, x64, vps]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: docker build -t app-scan:${{ github.sha }} .
+
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: app-scan:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true

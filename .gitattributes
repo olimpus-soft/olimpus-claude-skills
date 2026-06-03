@@ -1,0 +1,36 @@
+# Normalizar line endings al hacer checkout
+* text=auto
+
+# Forzar LF en scripts y archivos de texto
+*.sh text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.go text eol=lf
+*.java text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.env text eol=lf
+*.env.example text eol=lf
+Makefile text eol=lf
+Dockerfile text eol=lf
+
+# Archivos binarios — no tocar line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Diff semántico
+*.md diff=markdown

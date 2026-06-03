@@ -1,0 +1,35 @@
+name: Mutation Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  mutation:
+    runs-on: [self-hosted, linux, x64, vps]
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # TODO: Configurar setup del stack y herramienta de mutation testing
+      # Python — mutmut
+      # Go    — go-mutesting
+      # Node  — stryker
+
+      - name: Setup del entorno
+        run: echo "→ Configurar según el stack del proyecto"
+
+      - name: Instalar dependencias
+        run: echo "→ Configurar según el stack del proyecto"
+
+      - name: Ejecutar tests unitarios primero
+        run: echo "→ Configurar según el stack del proyecto"
+
+      - name: Ejecutar mutation testing
+        run: echo "→ Configurar según el stack del proyecto"
+
+      - name: Reportar mutantes sobrevivientes
+        run: echo "→ Configurar según el stack del proyecto"

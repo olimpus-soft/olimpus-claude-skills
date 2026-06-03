@@ -1,0 +1,56 @@
+repos:
+  # ── Checks generales ────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-case-conflict
+
+  # ── Detección de secretos ────────────────────────────────────────────────────
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: poetry.lock
+
+  # ── TODO: Agregar hooks específicos del stack del proyecto ───────────────────
+  # Python — Ruff:
+  # - repo: https://github.com/astral-sh/ruff-pre-commit
+  #   rev: v0.9.0
+  #   hooks:
+  #     - id: ruff
+  #       args: [--fix]
+  #     - id: ruff-format
+
+  # Go — gofmt:
+  # - repo: https://github.com/dnephin/pre-commit-golang
+  #   rev: v0.5.1
+  #   hooks:
+  #     - id: go-fmt
+  #     - id: go-vet
+
+  # Node — eslint / prettier:
+  # - repo: local
+  #   hooks:
+  #     - id: eslint
+  #       name: eslint
+  #       entry: npx eslint
+  #       language: node
+  #       files: \.(js|ts|jsx|tsx)$
+
+  # ── Firma MAMCO/OLSOFT ──────────────────────────────────────────────────────
+  - repo: https://github.com/olimpus-soft/precommit-olimpus
+    rev: v1.0.0
+    hooks:
+      - id: add-signature

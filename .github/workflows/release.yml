@@ -1,0 +1,28 @@
+name: Release — Tag & Changelog
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: [self-hosted, linux, x64, vps]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create Release
+        uses: googleapis/release-please-action@v5
+        with:
+          # TODO: ajustar release-type al stack del proyecto
+          # Opciones: python, go, node, java, simple, etc.
+          release-type: simple
+          token: ${{ secrets.GITHUB_TOKEN }}

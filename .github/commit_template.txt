@@ -1,0 +1,14 @@
+# <tipo>(<scope>): <descripción en imperativo, máx 72 chars>
+#
+# Tipos: feat | fix | refactor | test | docs | chore | perf | ci | build
+# Scopes: (ajustar según el dominio del proyecto)
+#   ej. api | domain | infra | auth | db | cache | workers | deps | config
+#
+# Cuerpo opcional (qué y por qué, no cómo):
+#
+#
+# Footer opcional:
+# Closes #<issue>
+# BREAKING CHANGE: <descripción>
+#
+# Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

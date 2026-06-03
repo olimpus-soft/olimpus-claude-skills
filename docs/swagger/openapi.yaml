@@ -1,0 +1,126 @@
+openapi: "3.1.0"
+
+info:
+  title: "{PROJECT_NAME} API"
+  description: |
+    API REST de **{PROJECT_NAME}** — OlimpusSoft.
+
+    ## Autenticación
+    La mayoría de endpoints requieren un JWT Bearer token en el header `Authorization`.
+
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ## Errores
+    Todos los errores siguen el formato estándar de la RFC 7807 (Problem Details).
+
+    ## Versionado
+    La API está versionada en la URL: `/v1/...`
+  version: "0.1.0"
+  contact:
+    name: OlimpusSoft
+    url: https://olimpussoft.com
+    email: miguelmoralescoterio@gmail.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/v1
+    description: Desarrollo local
+  - url: https://api-stage.olimpussoft.com/v1
+    description: Staging
+  - url: https://api.olimpussoft.com/v1
+    description: Producción
+
+tags:
+  - name: health
+    description: Estado del servicio
+  - name: resources
+    description: Recursos principales (completar según el dominio)
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Verifica que el servicio esté operativo.
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Servicio no disponible
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+
+  # TODO: Agregar los endpoints del proyecto aquí
+  # Ejemplo:
+  # /resources:
+  #   get:
+  #     tags: [resources]
+  #     summary: Listar recursos
+  #     ...
+  #   post:
+  #     tags: [resources]
+  #     summary: Crear recurso
+  #     ...
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, version]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          example: ok
+        version:
+          type: string
+          example: "1.0.0"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-04-29T10:00:00Z"
+
+    ProblemDetail:
+      type: object
+      description: Error en formato RFC 7807
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://olimpussoft.com/errors/not-found"
+        title:
+          type: string
+          example: "Recurso no encontrado"
+        status:
+          type: integer
+          example: 404
+        detail:
+          type: string
+          example: "El recurso con id '123' no existe"
+        instance:
+          type: string
+          format: uri
+          example: "/v1/resources/123"
+
+    # TODO: Agregar schemas específicos del proyecto
+
+security:
+  - BearerAuth: []

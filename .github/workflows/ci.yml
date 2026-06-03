@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+jobs:
+  test:
+    name: Tests + Lint + Cobertura
+    runs-on: [self-hosted, linux, x64, vps]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: app_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # TODO: Reemplazar los steps de setup, install, lint, test y cobertura
+      # según el stack del proyecto. Ver ejemplos en docs/guide/ci.md
+
+      - name: Setup del entorno
+        run: |
+          echo "→ Reemplazar con setup del stack (Python, Go, Node, Java, etc.)"
+
+      - name: Instalar dependencias
+        run: |
+          echo "→ Reemplazar con: poetry install / go mod download / npm ci / mvn install"
+
+      - name: Lint
+        run: |
+          echo "→ Reemplazar con: ruff check / golangci-lint / eslint / checkstyle"
+
+      - name: Formato
+        run: |
+          echo "→ Reemplazar con: ruff format --check / gofmt / prettier --check"
+
+      - name: Tests con cobertura
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_pass@localhost:5432/app_test_db
+          REDIS_URL: redis://localhost:6379/15
+          INTERNAL_SECRET: test-internal-secret
+          APP_ENV: test
+        run: |
+          echo "→ Reemplazar con: pytest --cov / go test -cover / jest --coverage"
+
+      - name: Subir cobertura a Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false

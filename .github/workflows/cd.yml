@@ -1,0 +1,68 @@
+name: CD — Deploy a Producción
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy al VPS
+    runs-on: [self-hosted, linux, x64, vps]
+
+    steps:
+      - name: Deploy vía SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            # TODO: Ajustar el directorio al proyecto
+            cd /opt/apps/{PROJECT_NAME}
+
+            echo "→ Actualizando código..."
+            git pull origin main
+
+            echo "→ Construyendo imagen..."
+            docker compose build
+
+            # TODO: Agregar migraciones si el stack las requiere
+            # echo "→ Aplicando migraciones..."
+            # docker compose run --rm --no-deps app {migration-command}
+
+            echo "→ Reiniciando servicio..."
+            docker compose up -d --no-deps --remove-orphans app
+
+            echo "→ Verificando health..."
+            for i in $(seq 1 12); do
+              if curl -sf http://localhost:${APP_PORT:-8000}/health > /dev/null 2>&1; then
+                echo "✓ Servicio saludable"
+                break
+              fi
+              if [ "$i" -eq 12 ]; then
+                echo "✗ Health check falló después de 60s"
+                docker compose logs --tail=50 app
+                exit 1
+              fi
+              echo "  Esperando... ($i/12)"
+              sleep 5
+            done
+
+            echo "→ Limpiando imágenes antiguas..."
+            docker image prune -f
+
+            echo "✓ Deploy completado: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+  notify-failure:
+    name: Notificar fallo
+    runs-on: [self-hosted, linux, x64, vps]
+    needs: deploy
+    if: failure()
+    steps:
+      - name: Log fallo
+        run: |
+          echo "Deploy fallido — revisar logs en GitHub Actions"
+          exit 1

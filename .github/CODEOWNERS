@@ -1,0 +1,11 @@
+# CODEOWNERS — {PROJECT_NAME}
+# Revisores obligatorios por path. Ajustar según la estructura del proyecto.
+
+# Dominio y lógica de negocio — revisión obligatoria
+# /src/domain/                  @miguelmoralescoterio
+
+# Workflows CI/CD — revisión obligatoria
+/.github/workflows/             @miguelmoralescoterio
+
+# Documentación general — cualquiera puede editar
+*.md

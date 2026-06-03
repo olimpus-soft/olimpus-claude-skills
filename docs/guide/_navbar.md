@@ -1,0 +1,4 @@
+- [Docs](/)
+- [API](/docs/swagger/index.html)
+- [GitHub](https://github.com/olimpus-soft/{PROJECT_NAME})
+- [OlimpusSoft](https://olimpussoft.com)

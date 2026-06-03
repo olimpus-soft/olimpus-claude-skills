@@ -1,0 +1,31 @@
+name: Stale — Close inactive issues and PRs
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+
+jobs:
+  stale:
+    runs-on: [self-hosted, linux, x64, vps]
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/stale@v10
+        with:
+          days-before-issue-stale: 30
+          days-before-pr-stale: 14
+          days-before-close: 7
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+          exempt-issue-labels: 'pinned,security'
+          exempt-pr-labels: 'pinned,security'
+          stale-issue-message: >
+            Este issue lleva 30 días sin actividad.
+            Se cerrará en 7 días si no hay respuesta.
+          stale-pr-message: >
+            Este PR lleva 14 días sin actividad.
+            Se cerrará en 7 días si no hay respuesta.
+          close-issue-message: 'Cerrado por inactividad. Reabre si sigue siendo relevante.'
+          close-pr-message: 'Cerrado por inactividad. Reabre si la implementación sigue siendo válida.'

@@ -1,0 +1,77 @@
+# ── macOS / Editor ────────────────────────────────────────────────────────────
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.tox/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+.eggs/
+*.egg-info/
+.venv/
+venv/
+env/
+mutants/
+.mutmut-cache/
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+storybook-static/
+dist-ssr/
+
+# ── Environment / Secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+*.crt
+private.pem
+public.pem
+
+# ── Logs / Temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+tmp/
+temp/
+
+# ── Media / Assets generados ──────────────────────────────────────────────────
+storage/local/
+storage/input/
+storage/output/
+uploads/
+media/
+segments/
+*.m3u8
+*.ts
+
+# ── Tooling ───────────────────────────────────────────────────────────────────
+playwright-report/
+test-results/
+uv.lock
+
+# ── Claude ────────────────────────────────────────────────────────────────────
+.claude/
+!.claude/CLAUDE.md
+!.claude/settings.local.json
+!.claude/skills/

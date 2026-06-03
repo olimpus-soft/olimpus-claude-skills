@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>{PROJECT_NAME} — Docs</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="https://olimpussoft.com/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.css">
+  <style>
+    :root {
+      --theme-color: #1a56db;
+      --sidebar-width: 280px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">Cargando documentación...</div>
+
+  <script>
+    window.$docsify = {
+      name: '{PROJECT_NAME}',
+      repo: 'https://github.com/olimpus-soft/{PROJECT_NAME}',
+      loadSidebar: true,
+      loadNavbar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      search: {
+        placeholder: 'Buscar...',
+        noData: 'Sin resultados',
+      },
+      pagination: {
+        previousText: '← Anterior',
+        nextText: 'Siguiente →',
+      },
+      copyCode: {
+        buttonText: 'Copiar',
+        errorText: 'Error',
+        successText: 'Copiado',
+      },
+      plugins: [],
+    };
+  </script>
+
+  <!-- Docsify core -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+
+  <!-- Plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code@2/dist/docsify-copy-code.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+
+  <!-- Syntax highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
+
+  <!--
+    DIAGRAMAS — Se usa Kroki en lugar de Mermaid directamente.
+
+    Kroki renderiza server-side via API (kroki.io), soporta múltiples diagramas
+    en la misma página sin conflictos. Soporta: Mermaid, PlantUML, Graphviz,
+    C4 (con PlantUML), Sequence, ERD, Gantt, etc.
+
+    Uso en Markdown:
+      ```kroki-mermaid
+      graph TD
+        A --> B
+      ```
+
+      ```kroki-plantuml
+      @startuml
+      Alice -> Bob: Hello
+      @enduml
+      ```
+
+    Más info: https://kroki.io
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-kroki@0.4.2/dist/docsify-kroki.min.js"></script>
+
+  <!-- Tema -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/js/docsify-themeable.min.js"></script>
+</body>
+</html>

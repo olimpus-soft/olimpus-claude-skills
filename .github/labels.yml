@@ -1,0 +1,67 @@
+# Capas de arquitectura
+# TODO: Ajustar los paths según la estructura del proyecto
+
+'domain':
+  - changed-files:
+      - any-glob-to-any-file: 'src/domain/**'
+
+'application':
+  - changed-files:
+      - any-glob-to-any-file: 'src/application/**'
+
+'infrastructure':
+  - changed-files:
+      - any-glob-to-any-file: 'src/infrastructure/**'
+
+'migrations':
+  - changed-files:
+      - any-glob-to-any-file: '**/migrations/**'
+
+# Tests
+'tests':
+  - changed-files:
+      - any-glob-to-any-file: 'tests/**'
+
+# CI/CD y configuración
+'github':
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+'config':
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'pyproject.toml'
+          - 'poetry.lock'
+          - 'go.mod'
+          - 'go.sum'
+          - 'package.json'
+          - 'package-lock.json'
+          - 'Makefile'
+          - 'Dockerfile'
+          - 'docker-compose*.yml'
+          - '.env*'
+          - '.pre-commit-config.yaml'
+
+# Documentación
+'docs':
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
+
+# Tipo de cambio por nombre de rama
+'feature':
+  - head-branch: ['^feature/', 'feature/']
+
+'fix':
+  - head-branch: ['^fix/', '^bugfix/', '^hotfix/', 'fix/', 'bugfix/', 'hotfix/']
+
+'chore':
+  - head-branch: ['^chore/', 'chore/']
+
+'release':
+  - base-branch: 'main'
+
+# Prioridad
+'security':
+  - head-branch: ['^hotfix/', '^bugfix/']

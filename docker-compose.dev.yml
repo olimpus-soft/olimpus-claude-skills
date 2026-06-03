@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-app}-postgres-dev
+    environment:
+      POSTGRES_USER: dev_user
+      POSTGRES_PASSWORD: dev_pass
+      POSTGRES_DB: ${COMPOSE_PROJECT_NAME:-app}_dev
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - app_dev_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-app}-postgres-test
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+      POSTGRES_DB: ${COMPOSE_PROJECT_NAME:-app}_test
+    ports:
+      - "${POSTGRES_TEST_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-app}-redis-dev
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  app_dev_db:
+    name: ${COMPOSE_PROJECT_NAME:-app}_dev_db

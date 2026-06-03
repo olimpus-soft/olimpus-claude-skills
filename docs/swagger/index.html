@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>{PROJECT_NAME} — API Reference</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; padding: 0; }
+    .topbar { background-color: #1a56db !important; }
+    .topbar-wrapper img { display: none; }
+    .topbar-wrapper::before {
+      content: "{PROJECT_NAME} — API Reference";
+      color: white;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = () => {
+      SwaggerUIBundle({
+        // Opción 1 — Usar URL del endpoint OpenAPI del servidor (recomendado en producción)
+        // url: "https://api.{PROJECT_NAME}.olimpussoft.com/openapi.json",
+
+        // Opción 2 — Cargar spec local (útil para desarrollo y template)
+        url: "./openapi.yaml",
+
+        dom_id: '#swagger-ui',
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset,
+        ],
+        layout: "StandaloneLayout",
+        deepLinking: true,
+        displayRequestDuration: true,
+        filter: true,
+        showExtensions: true,
+        showCommonExtensions: true,
+        tryItOutEnabled: true,
+        persistAuthorization: true,
+        defaultModelsExpandDepth: 2,
+        defaultModelExpandDepth: 2,
+      });
+    };
+  </script>
+</body>
+</html>

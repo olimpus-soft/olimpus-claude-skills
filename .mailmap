@@ -1,0 +1,7 @@
+# Normaliza nombres y emails de autores en git log.
+# Formato: Nombre Canónico <email-canónico> Nombre Alternativo <email-alternativo>
+#
+# Ejemplo:
+#   Miguel Morales <miguelmoralescoterio@gmail.com> migmorales <migmorales@oldcompany.com>
+
+Miguel Morales <miguelmoralescoterio@gmail.com>
