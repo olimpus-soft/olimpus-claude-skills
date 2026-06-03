@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: Tests + Lint + Cobertura
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral]
 
     services:
       postgres:

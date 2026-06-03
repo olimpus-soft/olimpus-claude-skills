@@ -12,7 +12,7 @@ jobs:
   # ── Escaneo de código fuente ──────────────────────────────────────────────
   sast:
     name: SAST — Análisis de código fuente
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral]
 
     steps:
       - name: Checkout
@@ -51,7 +51,7 @@ jobs:
   # ── Escaneo de contenedor ─────────────────────────────────────────────────
   trivy:
     name: Trivy — Container Security Scan
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral]
 
     steps:
       - name: Checkout
