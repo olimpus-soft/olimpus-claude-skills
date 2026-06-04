@@ -7,7 +7,7 @@ on:
 
 jobs:
   mutation:
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral-8gb]
     continue-on-error: true
 
     steps:

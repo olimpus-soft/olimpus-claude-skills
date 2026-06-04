@@ -7,7 +7,7 @@ on:
 jobs:
   deploy:
     name: Deploy al VPS
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral]
 
     steps:
       - name: Deploy vía SSH
@@ -58,7 +58,7 @@ jobs:
 
   notify-failure:
     name: Notificar fallo
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral]
     needs: deploy
     if: failure()
     steps:

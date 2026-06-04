@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   label:
-    runs-on: [self-hosted, linux, x64, vps]
+    runs-on: [self-hosted, linux, x64, vps-ephemeral]
     steps:
       - name: Pull Request Labeler
         uses: actions/labeler@v6
