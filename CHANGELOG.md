@@ -7,6 +7,12 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-06-04
+
+### Fixed
+
+- **[OLIMPUSSW-404 hotfix v1.1.2] `plugin.json` — quitar campo `skills` con formato inválido (array de strings):** el formato `"skills": ["pr-review", "quality-test", ...]` (array de strings) **NO es válido** per [docs oficiales Claude Code Plugins reference](https://code.claude.com/docs/en/plugins-reference#plugin-manifest-schema). El schema espera que `skills` sea un **string path** (ej: `"./custom/skills/"`) cuando se quiere customizar la ubicación, o **omitido** para que Claude Code auto-descubra desde el path default `skills/` del plugin. El loader del `claude-code-action@v1` rechaza el manifest con `"invalid manifest plugin.json: skills: Invalid input"` (detectado por levi en validación Plan B C2 round-3). **Fix:** se elimina el campo del manifest — las 13 skills (`pr-review`, `quality-test`, `pr-comments-resolver`, `pr-generate`, `commitmsg`, `review-py`, `review-frontend`, `review-go`, `review-java`, `arch-py`, `arch-frontend`, `arch-go`, `arch-java`) viven en `plugins/pr-review-toolkit/skills/<name>/SKILL.md` y son auto-descubiertas correctamente. Bump patch `1.1.1` → `1.1.2` en `marketplace.json` + `plugin.json` + `.release-please-manifest.json` (los tres alineados ahora). Bloqueante crítico Plan B → rollout 3.0.
+
 ## [1.1.1] - 2026-06-04
 
 ### Fixed
