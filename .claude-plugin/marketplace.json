@@ -6,13 +6,13 @@
     "url": "https://github.com/olimpus-soft"
   },
   "description": "Plugin marketplace de Claude Code de OlimpusSoft — skills para review de PRs, análisis de calidad de tests y guías de arquitectura por stack",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "plugins": [
     {
       "name": "pr-review-toolkit",
       "source": "./plugins/pr-review-toolkit",
       "description": "Toolkit completo de review de PRs para OlimpusSoft: análisis exhaustivo, calidad de tests, resolución de comentarios, generación de descripciones y guías de arquitectura por stack (Python, Frontend, Go, Java)",
-      "version": "1.1.0"
+      "version": "1.1.2"
     }
   ]
 }
