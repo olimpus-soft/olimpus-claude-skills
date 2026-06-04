@@ -7,6 +7,12 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-04
+
+### Fixed
+
+- **[OLIMPUSSW-404 hotfix v1.1.1] `marketplace.json` — corregir schema del campo `plugins` a array de objetos:** el formato `"plugins": ["plugins/pr-review-toolkit"]` (array de strings con paths) es inválido per [docs oficiales Claude Code Plugin Marketplaces](https://code.claude.com/docs/en/plugin-marketplaces#create-the-marketplace-file). El loader rechaza el marketplace con error `"pr-review-toolkit not found in marketplace"` (detectado en run `26931012520` durante validación Plan B). Schema correcto: `"plugins": [{ name, source, description, version }]`. Bloqueante crítico Plan B → rollout 3.0 → 12 repos OlimpusSoft. Bump patch `1.1.0` → `1.1.1` (manifest del marketplace; plugin `pr-review-toolkit` mantiene `1.1.0` — su contenido no cambió).
+
 ## [1.1.0] - 2026-06-03
 
 ### Fixed
