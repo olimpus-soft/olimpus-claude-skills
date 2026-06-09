@@ -1,0 +1,141 @@
+name: PR Review Gate (Claude)
+
+on:
+  workflow_run:
+    workflows: ["CI", "Bandit — Python Security Analysis", "Trivy — Container Security Scan"]
+    types: [completed]
+
+concurrency:
+  group: pr-review-${{ github.event.workflow_run.pull_requests[0].number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-review-gate:
+    name: PR Review Gate
+    # Solo si CI verde + disparado por pull_request (no push directo)
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+
+    steps:
+      # Resuelve PR number y verifica que no sea draft (draft no está en objeto simplificado de workflow_run)
+      - name: Obtener info del PR
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.workflow_run.pull_requests?.[0]?.number;
+            if (!prNumber) {
+              core.setOutput('skip', 'true');
+              core.setOutput('pr_number', '');
+              console.log('No PR encontrado en workflow_run — skipping');
+              return;
+            }
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            core.setOutput('skip', pr.draft ? 'true' : 'false');
+            core.setOutput('pr_number', String(pr.number));
+            console.log(`PR #${pr.number} | draft=${pr.draft}`);
+
+      - name: Saltar si PR en draft o no encontrado
+        if: steps.pr-info.outputs.skip == 'true'
+        run: |
+          echo "PR en draft o no encontrado — review omitido"
+          exit 0
+
+      # Token efímero del GitHub App olimpus-hermes-bot — permite que los
+      # `gh pr review/comment/approve` del skill (Bash heredado dentro del
+      # action) se firmen como `olimpus-hermes-bot[bot]` en lugar del
+      # actor que disparó el workflow.
+      - name: Generar token GitHub App (olimpus-hermes-bot)
+        id: bot
+        if: steps.pr-info.outputs.skip == 'false'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - uses: actions/checkout@v4
+        if: steps.pr-info.outputs.skip == 'false'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Claude — Revisión de PR
+        if: steps.pr-info.outputs.skip == 'false'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.bot.outputs.token }}
+          # Inputs NATIVOS del action — instalan marketplace + plugin ANTES de arrancar Claude Code.
+          # Reemplaza el patrón legacy de `/plugin marketplace add` + `/plugin install` en el prompt,
+          # que el action NO ejecuta (sólo trata el prompt como mensaje a la sesión, ya iniciada).
+          plugin_marketplaces: |
+            https://github.com/olimpus-soft/olimpus-claude-skills.git
+          plugins: |
+            pr-review-toolkit@olimpus-claude-skills
+          prompt: |
+            Ejecuta una revisión completa de este pull request invocando, en este orden y como mensajes independientes:
+
+            Publica la review formal usando el CLI `gh` con `GH_TOKEN`, para que `olimpus-hermes-bot[bot]` quede siempre como reviewer formal. Mantén activa la coexistencia con `claude[bot]` y `chatgpt-codex-connector[bot]`: cualquiera de los tres puede dejar evidencia, pero Hermes debe intentar firmar la revisión.
+
+
+            1. `/pr-review-toolkit:pr-review ${{ github.repository }}#${{ steps.pr-info.outputs.pr_number }}`
+            2. `/pr-review-toolkit:quality-test`
+
+            El plugin `pr-review-toolkit` ya quedó instalado por el action vía `plugins:` — invocá directo las skills namespaced. NO agrupar los dos slash commands en un mismo mensaje (sólo el primer `/` se interpreta como comando, el resto queda como argumento). Tras terminar, cierra con `/pr-review-toolkit:pr-comments-resolver` o el Paso 6 desbloqueo del propio pr-review si aplica.
+          claude_args: |
+            --model ${{ vars.CLAUDE_REVIEW_MODEL || 'claude-opus-4-7' }}
+            --effort high
+            --allowedTools Bash(gh:*),Bash(git:*),Bash(jq:*),Bash(mkdir:*),Bash(grep:*),Bash(find:*),Bash(sed:*),Bash(awk:*),Bash(cat:*),Bash(ls:*),Bash(wc:*),Bash(head:*),Bash(tail:*),Read,Write,Edit,Grep,Glob,Skill
+            --append-system-prompt "Responde en español colombiano neutro. Aplica reglas del repo (CLAUDE.md + AGENTS.md). Prioriza seguridad. Bash está restringido a comandos específicos (no shell libre) para mitigar prompt injection vía contenido del PR."
+        env:
+          # GITHUB_TOKEN sigue apuntando a GH_PACKAGES_READ_TOKEN para que
+          # la instalación del marketplace y plugins lea desde GHCR.
+          GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_READ_TOKEN }}
+          # GH_TOKEN tiene precedencia sobre GITHUB_TOKEN para el CLI `gh`
+          # — cualquier `gh pr review/comment/approve` que ejecute el skill
+          # desde el Bash del action se firmará como olimpus-hermes-bot[bot].
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+
+      # G_WORKFLOW_REALLY_WORKED — smoke test: el check sólo es verde si Claude
+      # realmente publicó al menos UN inline comment o review formal para el
+      # head SHA del PR. Evita "verdes silenciosos" como el que sufrió el
+      # patrón anterior (slash-commands-en-prompt sin instalar nada).
+      - name: Verify Claude review ran
+        if: steps.pr-info.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # Filtro defensivo: en olimpus-auth coexisten tres reviewers
+          # automáticos para un mismo HEAD_SHA:
+          #   1. `claude[bot]`                — GH App propia del action claude-code-action@v1
+          #   2. `olimpus-hermes-bot[bot]`    — bot del rollout OLIMPUSSW-410 (gh pr review/comment desde el skill)
+          #   3. `chatgpt-codex-connector[bot]` — workflow Codex paralelo (otro reviewer automático del repo)
+          # Sufijos `[bot]` verificados en pulls/{N}/reviews y pulls/{N}/comments
+          # endpoints REST. Aceptamos cualquiera de las tres identidades para
+          # no romper el gate.
+          inline_count=$(gh api --paginate "repos/${{ github.repository }}/pulls/${PR_NUMBER}/comments?per_page=100" \
+            --jq "[.[] | select((.user.login == \"claude[bot]\" or .user.login == \"olimpus-hermes-bot[bot]\" or .user.login == \"chatgpt-codex-connector[bot]\") and .commit_id == \"${HEAD_SHA}\")] | length" \
+            | awk '{s+=$1} END {print s+0}')
+          review_count=$(gh api --paginate "repos/${{ github.repository }}/pulls/${PR_NUMBER}/reviews?per_page=100" \
+            --jq "[.[] | select((.user.login == \"claude[bot]\" or .user.login == \"olimpus-hermes-bot[bot]\" or .user.login == \"chatgpt-codex-connector[bot]\") and .commit_id == \"${HEAD_SHA}\")] | length" \
+            | awk '{s+=$1} END {print s+0}')
+          total=$((inline_count + review_count))
+          if [ "${total}" -lt 1 ]; then
+            echo "::error::Ningún reviewer automático (claude[bot] / olimpus-hermes-bot[bot] / chatgpt-codex-connector[bot]) publicó review ni inline comments para SHA ${HEAD_SHA}. Workflow misconfigured — revisar plugin_marketplaces/plugins/prompt."
+            exit 1
+          fi
+          echo "Reviewer automático publicó: ${inline_count} inline comments + ${review_count} formal reviews para SHA ${HEAD_SHA} ✅"

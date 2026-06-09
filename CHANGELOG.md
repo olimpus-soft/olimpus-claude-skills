@@ -7,6 +7,10 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **[OLIMPUSSW-438] Propagar 8 workflows canónicos del template:** añade `backport.yml`, `claude.yml`, `codex-review-gate.yml`, `docker-publish.yml`, `gitflow.yml`, `pr-checks.yml`, `runner-control.yml` y `scorecard.yml` copiados literalmente desde `olimpuss-template@HEAD` (PR#33). Habilita CI gates (Codex review, PR conventions, GitFlow Guard), runner-control ephemeral y OpenSSF Scorecard en el repo marketplace. No incluye `codeql.yml` ni `dependency-review.yml` (decisión NO-GHAS 2026-06-02).
+
 ## [1.1.2] - 2026-06-04
 
 ### Fixed

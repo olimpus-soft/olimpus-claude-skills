@@ -1,0 +1,113 @@
+name: Codex Review Gate
+
+on:
+  pull_request_target:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: codex-review-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  codex-review:
+    name: Codex Review Gate
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Generar token GitHub App (olimpus-hermes-bot)
+        id: bot
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      # Resuelve PR number y verifica que no sea draft
+      - name: Obtener info del PR
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'pending',
+              context: 'Codex Review Gate',
+              description: 'Esperando CI y evidencia de Codex',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
+
+      - name: Esperar checks requeridos
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          pending_required=$(gh pr checks "$PR_NUMBER" --required --json name,bucket \
+            --jq '[.[] | select(.bucket != "pass" and .bucket != "skipping") | select(.name != "Trigger Codex Connector") | .name] | join(", ")')
+          if [ -n "$pending_required" ]; then
+            echo "::error::Checks requeridos pendientes o fallando antes de pedir Codex review: ${pending_required}"
+            exit 1
+          fi
+
+          already=$(gh api --paginate "repos/${GH_REPO}/issues/${PR_NUMBER}/comments?per_page=100" \
+            --jq "[.[] | select((.user.login == \"olimpus-hermes-bot[bot]\" or .user.login == \"github-actions[bot]\") and (.body | contains(\"codex-review-head:${HEAD_SHA}\")))] | length" \
+            | awk '{s+=$1} END {print s+0}')
+          if [ "$already" -gt 0 ]; then
+            echo "Codex review ya solicitada para HEAD_SHA=${HEAD_SHA}; skip idempotente."
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUMBER" --body-file - <<EOF
+          @codex review
+
+            latest=$(jq '
+              group_by(.workflow + "\u0000" + .name) |
+              map(max_by(.startedAt)) |
+              map(select(.name != "PR Review Gate" and .name != "Codex Review Gate"))
+            ' <<<"$checks")
+            ci_count=$(jq '[.[] | select(.workflow == "CI")] | length' <<<"$latest")
+            failing=$(jq -r '[.[] | select(.bucket != "pass" and .bucket != "skipping" and .bucket != "pending") | .name] | join(", ")' <<<"$latest")
+            pending=$(jq -r '[.[] | select(.bucket == "pending") | .name] | join(", ")' <<<"$latest")
+
+            if [ -n "$failing" ]; then
+              echo "::error::Checks fallando antes de Codex review: ${failing}"
+              exit 1
+            fi
+            if [ "$ci_count" -gt 0 ] && [ -z "$pending" ]; then
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Timeout esperando CI/checks antes de Codex review: ${pending:-CI no registrado}"
+              exit 1
+            fi
+            echo "Esperando CI/checks antes de Codex review: ${pending:-CI no registrado}"
+            sleep 15
+          done
+
+          Por favor:
+          - deja comentarios inline en los archivos cuando haya algo accionable
+          - los comentarios deben ser específicos y fáciles de responder
+          - usa comentarios que puedan marcarse como resueltos en GitHub
+          - prioriza bugs, riesgos, regresiones y problemas importantes antes que detalles menores
+          - si algo es solo una sugerencia, márcalo como sugerencia
+          - si no encuentras problemas relevantes, dilo claramente
+          - no hagas cambios en el código todavía, solo revisión
+
+          <!-- codex-review-head:${HEAD_SHA} -->
+          EOF
