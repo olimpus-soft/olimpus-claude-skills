@@ -8,8 +8,8 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 ## [Unreleased]
 
 ### Added
-
 - **[OLIMPUSSW-438] Propagar 8 workflows canónicos del template:** añade `backport.yml`, `claude.yml`, `codex-review-gate.yml`, `docker-publish.yml`, `gitflow.yml`, `pr-checks.yml`, `runner-control.yml` y `scorecard.yml` copiados literalmente desde `olimpuss-template@HEAD` (PR#33). Habilita CI gates (Codex review, PR conventions, GitFlow Guard), runner-control ephemeral y OpenSSF Scorecard en el repo marketplace. No incluye `codeql.yml` ni `dependency-review.yml` (decisión NO-GHAS 2026-06-02).
+- **[OLIMPUSSW-442] `pr-review` SKILL — Paso 2.6: cargar identidad bot `olimpus-hermes-bot[bot]` antes de publicar:** nueva sección obligatoria que ejecuta `unset GH_TOKEN GITHUB_TOKEN && BOT_TOKEN=$(bash ~/olimpussoft/manager/agents/bin/bot-token.sh --raw)` y pasa `BOT_TOKEN` INLINE a cada `gh pr review|comment|api` de los Pasos 3, 4, 5 y 6. Necesario porque el keyring de `gh` (CLI local con `gh auth login`) pisa `export GH_TOKEN` del shell — sólo `GH_TOKEN=... gh ...` inline garantiza override. Si `bot-token.sh` falla, fallback a identidad humana con WARNING visible (nunca aborta). Resuelve que la review pueda salir firmada como humano en CLI local pero como bot en CI/agentes remotos — ahora es uniforme en todos los entornos.
 
 ## [1.1.2] - 2026-06-04
 
