@@ -1,0 +1,206 @@
+name: Backport & Sync PRs
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - master
+      - develop
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Flujo a ejecutar"
+        required: true
+        type: choice
+        options:
+          - main-to-develop
+          - develop-to-features
+      source_branch:
+        description: "Rama origen para main/master → develop"
+        required: false
+        default: main
+        type: choice
+        options:
+          - main
+          - master
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.base.ref || inputs.mode || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  main_to_develop:
+    name: Backport main/master → develop via PR
+    runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
+    timeout-minutes: 35
+    if: >-
+      ${{
+        (github.event_name == 'pull_request' &&
+         github.event.pull_request.merged == true &&
+         (github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'master')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.mode == 'main-to-develop')
+      }}
+
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ secrets.BACKPORT_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve source branch
+        id: source
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "branch=${{ inputs.source_branch }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "branch=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge source into develop workspace
+        run: |
+          set -euo pipefail
+
+          SOURCE_BRANCH="${{ steps.source.outputs.branch }}"
+
+          git fetch origin "+refs/heads/*:refs/remotes/origin/*" --prune
+          git checkout develop
+          git reset --hard origin/develop
+
+          echo "Merging origin/${SOURCE_BRANCH} into develop..."
+          git merge "origin/${SOURCE_BRANCH}" --no-edit
+
+      - name: Open PR to develop
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.BACKPORT_TOKEN }}
+          branch: chore/backport-${{ steps.source.outputs.branch }}-to-develop
+          base: develop
+          title: "chore(backport): ${{ steps.source.outputs.branch }} → develop"
+          body: |
+            Backport automático desde `${{ steps.source.outputs.branch }}` hacia `develop`.
+
+            Evento: `${{ github.event_name }}`
+            SHA: `${{ github.sha }}`
+
+            > Este PR mantiene `develop` alineada con lo que ya fue promovido a producción.
+          labels: |
+            backport
+            automated
+          delete-branch: true
+
+  develop_to_features:
+    name: Sync develop → feature/* via PRs
+    runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
+    timeout-minutes: 35
+    if: >-
+      ${{
+        (github.event_name == 'pull_request' &&
+         github.event.pull_request.merged == true &&
+         github.event.pull_request.base.ref == 'develop') ||
+        (github.event_name == 'workflow_dispatch' && inputs.mode == 'develop-to-features')
+      }}
+
+    steps:
+      - name: Install GitHub CLI
+        run: |
+          archive="$RUNNER_TEMP/gh.tar.gz"
+          curl -fsSL https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_amd64.tar.gz -o "$archive"
+          echo "02d1290eba130e0b896f3709ffff22e1c75a51475ddb70476a85abc6b5807af0  $archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp "$RUNNER_TEMP/gh_2.93.0_linux_amd64/bin/gh" "$RUNNER_TEMP/bin/gh"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.BACKPORT_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create PRs from develop to feature branches
+        env:
+          GH_TOKEN: ${{ secrets.BACKPORT_TOKEN }}
+          REPO: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "+refs/heads/*:refs/remotes/origin/*" --prune
+
+          # Solo sincronizar ramas con PR abierto hacia develop (evita ramas abandonadas)
+          FEATURE_BRANCHES=$(gh pr list \
+            --repo "$REPO" \
+            --base develop \
+            --state open \
+            --json headRefName \
+            --jq '[.[].headRefName | select(startswith("feature/")) | select(test("(^dependabot/|/dependabot/)")  | not)] | .[]' \
+            || true)
+
+          if [ -z "$FEATURE_BRANCHES" ]; then
+            echo "No hay ramas feature/* con PRs abiertos hacia develop para sincronizar."
+            exit 0
+          fi
+
+          for TARGET_BRANCH in $FEATURE_BRANCHES; do
+            echo "────────────────────────────────────────"
+            echo "Preparando PR develop → ${TARGET_BRANCH}"
+
+            SAFE_TARGET=$(echo "$TARGET_BRANCH" | sed 's#[^A-Za-z0-9._-]#-#g')
+            BACKPORT_BRANCH="chore/backport-develop-to-${SAFE_TARGET}"
+
+            git checkout -B "$BACKPORT_BRANCH" "origin/$TARGET_BRANCH"
+
+            if ! git merge origin/develop --no-edit; then
+              echo "✗ Conflicto al sincronizar develop → ${TARGET_BRANCH}. Se omite; requiere resolución manual."
+              git merge --abort || true
+              continue
+            fi
+
+            if git diff --quiet "origin/$TARGET_BRANCH"...HEAD; then
+              echo "✓ ${TARGET_BRANCH} ya está alineada con develop."
+              continue
+            fi
+
+            git push --force-with-lease origin "$BACKPORT_BRANCH"
+
+            EXISTING_PR=$(gh pr list \
+              --repo "$REPO" \
+              --base "$TARGET_BRANCH" \
+              --head "$BACKPORT_BRANCH" \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty')
+
+            if [ -n "$EXISTING_PR" ]; then
+              echo "✓ Ya existe PR #${EXISTING_PR} para ${TARGET_BRANCH}."
+              continue
+            fi
+
+            gh pr create \
+              --repo "$REPO" \
+              --base "$TARGET_BRANCH" \
+              --head "$BACKPORT_BRANCH" \
+              --title "chore(backport): develop → ${TARGET_BRANCH}" \
+              --body "Backport automático desde \`develop\` hacia \`${TARGET_BRANCH}\`.\n\nSHA origen: \`${SOURCE_SHA}\`\n\nEste PR permite revisar la sincronización antes de tocar la rama feature." \
+              --label backport \
+              --label automated
+
+            echo "✓ PR creado para ${TARGET_BRANCH}"
+          done

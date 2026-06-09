@@ -1,0 +1,72 @@
+name: GitFlow Guard
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches:
+      - develop
+      - main
+      - master
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate_gitflow:
+    name: Validate GitFlow branch rules
+    runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
+    timeout-minutes: 10
+
+    steps:
+      - name: Validate allowed source → target flow
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+
+          echo "HEAD_REF=${HEAD_REF}"
+          echo "BASE_REF=${BASE_REF}"
+          echo "ACTOR=${ACTOR}"
+
+          # Dependabot puede abrir PRs controlados por dependabot.yml.
+          if [ "$ACTOR" = "dependabot[bot]" ]; then
+            echo "✓ Dependabot PR permitido."
+            exit 0
+          fi
+
+          # release-please abre PRs con rama release-please--branches--main--...
+          if echo "$HEAD_REF" | grep -qE '^release-please--'; then
+            echo "✓ PR de release-please permitido."
+            exit 0
+          fi
+
+          case "$BASE_REF" in
+            develop)
+              if echo "$HEAD_REF" | grep -qE '^(feature|fix|bugfix|bug|chore|docs|hotfix|backport|chore/backport)/'; then
+                echo "✓ Flujo permitido hacia develop."
+              else
+                echo "✗ Solo feature/fix/chore/docs/hotfix/backport pueden ir hacia develop."
+                exit 1
+              fi
+              ;;
+
+            main|master)
+              if echo "$HEAD_REF" | grep -qE '^(release|hotfix|backport|chore/backport)/'; then
+                echo "✓ Flujo permitido hacia main/master."
+              else
+                echo "✗ Solo release/hotfix/backport pueden ir hacia main/master."
+                exit 1
+              fi
+              ;;
+
+            *)
+              echo "✓ Base no controlada por GitFlow Guard."
+              ;;
+          esac

@@ -1,0 +1,79 @@
+name: PR — Validación Release Process
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  validate:
+    name: Validar convenciones del PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validar nombre de rama origen
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "Rama origen: $HEAD_REF"
+
+          VALID_PREFIXES="^(feature|fix|bugfix|bug|chore|docs|release|hotfix)\/OLIMPUSSW-[0-9]+"
+
+          if echo "$HEAD_REF" | grep -qE "$VALID_PREFIXES"; then
+            echo "✓ Nombre de rama válido: $HEAD_REF"
+          else
+            echo "✗ Nombre de rama inválido: $HEAD_REF"
+            echo ""
+            echo "Formato requerido: {prefijo}/OLIMPUSSW-{número}-{descripción-kebab}"
+            echo "Ejemplos válidos:"
+            echo "  feature/OLIMPUSSW-42-login-rbac"
+            echo "  fix/OLIMPUSSW-77-token-expiration"
+            echo "  chore/OLIMPUSSW-12-dep-vulnerabilities"
+            echo "  release/OLIMPUSSW-99-sprint-3"
+            exit 1
+          fi
+
+      - name: Validar título del PR (Conventional Commits)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "Título del PR: $PR_TITLE"
+
+          VALID_TYPES="feat|fix|chore|docs|refactor|test|ci|build|perf|hotfix|release"
+          PATTERN="^($VALID_TYPES)(\(.+\))?: .{10,}"
+
+          if echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "✓ Título válido: $PR_TITLE"
+          else
+            echo "✗ Título inválido: $PR_TITLE"
+            echo ""
+            echo "Formato requerido: {type}({scope}): {descripción mínimo 10 chars}"
+            echo "Tipos válidos: feat, fix, chore, docs, refactor, test, ci, build, perf, hotfix, release"
+            echo "Ejemplos válidos:"
+            echo "  feat(OLIMPUSSW-42): implementar login con RBAC"
+            echo "  fix(OLIMPUSSW-77): corregir rotación de refresh token"
+            echo "  chore(OLIMPUSSW-5): mejorar GitHub Actions workflows"
+            exit 1
+          fi
+
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verificar cambios en CHANGELOG.md
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -c "^CHANGELOG.md$" || true)
+
+          if [ "$CHANGED" -gt 0 ]; then
+            echo "✓ CHANGELOG.md fue actualizado"
+          else
+            echo "✗ CHANGELOG.md no fue actualizado"
+            echo ""
+            echo "Todo PR con cambios funcionales debe actualizar CHANGELOG.md."
+            echo "Agrega una entrada bajo la sección [Unreleased] antes de abrir el PR."
+            exit 1
+          fi

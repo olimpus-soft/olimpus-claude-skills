@@ -1,0 +1,209 @@
+name: Runner Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "destroy | provision | rerun"
+        required: true
+        type: choice
+        options: [destroy, provision, rerun]
+      target:
+        description: "runner_id, run_id o 'last'"
+        required: true
+        default: "last"
+  issue_comment:
+    types: [created]
+
+permissions:
+  # actions: read es suficiente — el force-cancel/rerun lo hace el orquestador vía X-Auth,
+  # no este workflow directamente (MEJORA-3 PR#32).
+  actions: read
+  contents: read
+
+concurrency:
+  # Key incluye el ID del comentario o run para evitar que dos órdenes
+  # simultáneas con distinto target (ej: "destroy runner A" + "destroy runner B")
+  # se cancelen entre sí. Cada comment/dispatch tiene ID único.
+  group: runner-control-${{ github.event.comment.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  control:
+    name: Runner Control
+    runs-on: ubuntu-latest
+    # Gate de autorización al nivel del `if:` para evitar que un comentario no autorizado
+    # provisione el runner ubuntu-latest + genere token de bot (CRITICO-1 PR#32).
+    # El step `Validar author_association` queda como defensa-en-profundidad.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' && (
+        startsWith(github.event.comment.body, 'destroy runner ') ||
+        startsWith(github.event.comment.body, 'cancel run ') ||
+        startsWith(github.event.comment.body, 'provision runner ') ||
+        github.event.comment.body == 'restart ci'
+      ) && (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      ))
+    timeout-minutes: 10
+
+    steps:
+      # Solo se genera el token cuando vamos a postear confirmación (issue_comment).
+      # En workflow_dispatch no se postea comentario, así que no hace falta token bot
+      # (CRITICO-2 PR#32). @v3 alineado con el bump dependabot del SDK (MEJORA-1).
+      - name: Generar token GitHub App (olimpus-hermes-bot)
+        id: bot
+        if: github.event_name == 'issue_comment'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Validar author_association (solo comentarios)
+        if: github.event_name == 'issue_comment'
+        env:
+          ASSOC: ${{ github.event.comment.author_association }}
+          ACTOR: ${{ github.event.comment.user.login }}
+        run: |
+          set -euo pipefail
+          case "$ASSOC" in
+            OWNER|MEMBER|COLLABORATOR)
+              echo "✅ Permiso verificado para $ACTOR (assoc=$ASSOC)"
+              ;;
+            *)
+              echo "::error::Usuario $ACTOR (assoc=$ASSOC) no tiene permiso para comandos de runner control"
+              exit 1
+              ;;
+          esac
+
+      - name: Parsear comando
+        id: cmd
+        env:
+          BODY: ${{ github.event.comment.body }}
+          DISP_ACTION: ${{ github.event.inputs.action }}
+          DISP_TARGET: ${{ github.event.inputs.target }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            action="$DISP_ACTION"
+            target="$DISP_TARGET"
+          else
+            # Trimming + parse de la PRIMERA línea — un comentario multi-line
+            # con texto adicional (`destroy runner 123\n\ncontext`) no debe
+            # tomar `context` como target (MEJORA-6 PR#32).
+            first_line=$(printf '%s' "$BODY" | head -n1)
+            first_line="${first_line#"${first_line%%[![:space:]]*}"}"
+            first_line="${first_line%"${first_line##*[![:space:]]}"}"
+            case "$first_line" in
+              "destroy runner "*)
+                action="destroy"
+                target="${first_line##* }"
+                ;;
+              "cancel run "*)
+                # Sinónimo de destroy alineado con el comportamiento real del endpoint:
+                # force-cancel del run + destrucción del droplet asociado.
+                action="destroy"
+                target="${first_line##* }"
+                ;;
+              "provision runner "*)
+                action="provision"
+                target="${first_line##* }"
+                ;;
+              "restart ci")
+                action="rerun"
+                target="last"
+                ;;
+              *)
+                echo "::error::Comentario no reconocido: $first_line"
+                exit 1
+                ;;
+            esac
+          fi
+          if [ -z "$action" ] || [ -z "$target" ]; then
+            echo "::error::action o target vacíos (action=$action target=$target)"
+            exit 1
+          fi
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "Parsed: action=$action target=$target"
+
+      - name: Ejecutar acción contra orquestador
+        id: exec
+        env:
+          ORCH_URL: ${{ secrets.ORCHESTRATOR_URL }}
+          ORCH_KEY: ${{ secrets.ORCHESTRATOR_KEY }}
+          ACTION: ${{ steps.cmd.outputs.action }}
+          TARGET: ${{ steps.cmd.outputs.target }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n \
+            --arg a "$ACTION" \
+            --arg t "$TARGET" \
+            --arg r "$REPO" \
+            '{action:$a, target:$t, repo:$r}')
+          echo "Payload: $payload"
+          # MEJORA-2 PR#32: timeout y retry contra cold start de DO Functions.
+          http_code=$(curl -sS \
+            --max-time 30 \
+            --retry 3 \
+            --retry-delay 2 \
+            --retry-connrefused \
+            -o /tmp/orch_resp.json -w "%{http_code}" \
+            -X POST \
+            -H "X-Auth: $ORCH_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$ORCH_URL")
+          echo "HTTP $http_code"
+          cat /tmp/orch_resp.json
+          echo ""
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Orquestador respondió HTTP $http_code"
+            exit 1
+          fi
+          gh_status=$(jq -r '.gh_status // "n/a"' /tmp/orch_resp.json)
+          echo "gh_status=$gh_status" >> "$GITHUB_OUTPUT"
+
+      - name: Confirmar en el PR/Issue (solo comentarios)
+        if: github.event_name == 'issue_comment' && success()
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          ACTION: ${{ steps.cmd.outputs.action }}
+          TARGET: ${{ steps.cmd.outputs.target }}
+          GH_STATUS: ${{ steps.exec.outputs.gh_status }}
+        run: |
+          set -euo pipefail
+          msg="✅ Runner control: \`$ACTION\` ejecutado para \`$TARGET\` (orquestador gh_status=$GH_STATUS)."
+          body=$(jq -n --arg b "$msg" '{body:$b}')
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d "$body" \
+            "https://api.github.com/repos/$REPO/issues/$ISSUE/comments"
+
+      - name: Reportar falla en el PR/Issue (solo comentarios)
+        if: github.event_name == 'issue_comment' && failure()
+        env:
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+          ACTION: ${{ steps.cmd.outputs.action }}
+          TARGET: ${{ steps.cmd.outputs.target }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          msg="❌ Runner control: \`$ACTION\` para \`$TARGET\` falló. Logs: $RUN_URL"
+          body=$(jq -n --arg b "$msg" '{body:$b}')
+          curl -sSf -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d "$body" \
+            "https://api.github.com/repos/$REPO/issues/$ISSUE/comments"
