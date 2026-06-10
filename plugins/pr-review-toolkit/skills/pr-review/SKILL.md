@@ -395,6 +395,64 @@ gh api user --jq '.login'
 # Guarda el resultado como REVIEWER_LOGIN
 ```
 
+## Paso 2.6 — Cargar identidad bot `olimpus-hermes-bot[bot]` antes de publicar
+
+**OBLIGATORIO ejecutar este paso antes de cualquier `gh pr review`, `gh pr comment`, `gh api .../reviews`, `gh api .../comments` o `gh api .../dismissals` de los Pasos 3, 4, 5 y 6.** Hace que la revisión aparezca firmada por la GitHub App **`olimpus-hermes-bot[bot]`** (no por el usuario humano) en todos los entornos: CLI local, agentes remotos o CI.
+
+### Por qué
+
+`gh` resuelve el token con la siguiente precedencia:
+
+1. `GITHUB_TOKEN` (env)
+2. `GH_TOKEN` (env)
+3. **Keyring** del SO (gh auth login)
+
+Si el usuario está autenticado con `gh auth login` (caso típico en CLI local), el keyring gana incluso aunque exportes `GH_TOKEN`. Resultado: la review se publica con identidad humana, no del bot. La única forma confiable es:
+
+- **Limpiar `GH_TOKEN` y `GITHUB_TOKEN` del entorno**, y
+- **Pasar el bot-token como `GH_TOKEN` INLINE en cada invocación** de `gh` (o exportarlo en un shell nuevo).
+
+### Comando a ejecutar (cada sesión de la skill)
+
+```bash
+# 1. Limpia tokens del entorno (importante: pisa el keyring sólo cuando GH_TOKEN está seteado)
+unset GH_TOKEN GITHUB_TOKEN
+
+# 2. Genera el installation token de la App olimpus-hermes-bot
+BOT_TOKEN=$(bash ~/olimpussoft/manager/agents/bin/bot-token.sh --raw 2>/dev/null || true)
+
+# 3. Validar que se obtuvo un token bot (formato ghs_...)
+if [[ -z "${BOT_TOKEN:-}" || "${BOT_TOKEN}" != ghs_* ]]; then
+  echo "⚠️  WARNING: bot-token.sh falló o no devolvió un installation token. La review se publicará con identidad humana (fallback). Verifica que ~/olimpussoft/manager/agents/bin/bot-token.sh y el .pem de olimpus-hermes-bot existan y sean accesibles." >&2
+  BOT_TOKEN=""   # señaliza fallback al keyring/humano
+fi
+
+# 4. Exportar para los pasos siguientes (igual lo pasarás INLINE por seguridad)
+export GH_TOKEN="$BOT_TOKEN"
+```
+
+### Patrón obligatorio al invocar `gh` en los pasos 3–6
+
+Pasar `GH_TOKEN` **inline** en cada llamada para garantizar que pisa cualquier keyring residual:
+
+```bash
+GH_TOKEN="$BOT_TOKEN" gh api repos/olimpus-soft/{REPO}/pulls/{N}/reviews \
+  --method POST --input /tmp/inline_review.json \
+  --jq '{id, state, user: .user.login}'
+```
+
+**Verificación esperada del primer call exitoso:** el campo `user.login` del response debe ser `olimpus-hermes-bot[bot]`. Si sale otro login (ej: `miguelmoralescoterio`), el fallback humano se activó — revisar el WARNING.
+
+### Fallback con WARNING visible
+
+Si `BOT_TOKEN` queda vacío, **no abortar** — el flujo continúa con la identidad del usuario humano (token del keyring). Solo dejar registrado el WARNING en stdout para trazabilidad. La revisión es funcional, simplemente no queda firmada como bot.
+
+### Casos donde NO aplica
+
+- Comandos `gh` de **lectura** (`gh pr view`, `gh pr diff`, `gh pr checks`, `gh api .../code-scanning/alerts`, etc.) del Paso 1 y 1.5 — pueden usar el token humano sin problema, no afectan al PR público.
+
+---
+
 ## Paso 3 — Publicación automática de TODOS los issues (sin confirmación)
 
 > **AUTÓNOMO:** la skill **NO pide confirmación**. Publica todos los issues encontrados (`MEJORA-*` y `CRITICO-*`) en una única revisión formal e inmediatamente después aplica los fixes y responde cada thread con la solución.
@@ -481,12 +539,16 @@ Crear el archivo `/tmp/inline_review.json` con este formato:
 
 ### Paso 4.4 — Publicar la revisión
 
+> **Identidad bot:** ejecutar este comando con `GH_TOKEN="$BOT_TOKEN"` INLINE para que la revisión salga firmada como `olimpus-hermes-bot[bot]` (ver **Paso 2.6**). El override inline es necesario porque el keyring de `gh` puede pisar el `export GH_TOKEN` del shell.
+
 ```bash
-gh api repos/olimpus-soft/{REPO}/pulls/{NUMERO_PR}/reviews \
+GH_TOKEN="$BOT_TOKEN" gh api repos/olimpus-soft/{REPO}/pulls/{NUMERO_PR}/reviews \
   --method POST \
   --input /tmp/inline_review.json \
-  --jq '{id: .id, state: .state, url: .html_url}'
+  --jq '{id: .id, state: .state, user: .user.login, url: .html_url}'
 ```
+
+**Verificación:** el campo `user.login` del response debe ser `"olimpus-hermes-bot[bot]"`. Si sale otro login, el fallback humano se activó (ver WARNING del Paso 2.6).
 
 ### Verificar que la revisión fue publicada
 
@@ -610,21 +672,22 @@ Identificar la(s) review(s) propias en estado `CHANGES_REQUESTED` y descartarlas
 
 ```bash
 # Listar reviews propias bloqueantes
-gh api repos/olimpus-soft/{REPO}/pulls/{NUMERO_PR}/reviews \
+GH_TOKEN="$BOT_TOKEN" gh api repos/olimpus-soft/{REPO}/pulls/{NUMERO_PR}/reviews \
   --jq '.[] | select(.state == "CHANGES_REQUESTED" and .user.login == "{BOT_O_USER_ACTUAL}") | .id'
 
-# Dismiss de cada una
-gh api -X PUT repos/olimpus-soft/{REPO}/pulls/{NUMERO_PR}/reviews/{REVIEW_ID}/dismissals \
+# Dismiss de cada una (requiere identidad bot — ver Paso 2.6)
+GH_TOKEN="$BOT_TOKEN" gh api -X PUT repos/olimpus-soft/{REPO}/pulls/{NUMERO_PR}/reviews/{REVIEW_ID}/dismissals \
   -f message="Fixes aplicados y verificados — ver respuestas en cada thread. Desbloqueo automático por pr-review."
 ```
 
 ### 6.4 Publicar review de aprobación final
 
 ```bash
-gh pr review {NUMERO_PR} --repo olimpus-soft/{REPO} --approve \
+# Identidad bot inline — ver Paso 2.6
+GH_TOKEN="$BOT_TOKEN" gh pr review {NUMERO_PR} --repo olimpus-soft/{REPO} --approve \
   --body "✅ Todos los issues señalados fueron corregidos. Threads resueltos, CI en verde. PR listo para merge.
 
-🤖 Aprobación automática por pr-review tras aplicación de fixes."
+🤖 Aprobación automática por pr-review tras aplicación de fixes (firmada como olimpus-hermes-bot[bot])."
 ```
 
 ### 6.5 Reportar al usuario
@@ -655,3 +718,4 @@ Mensaje final al usuario con:
    - Si cualquier comando `gh` falla por otro motivo → mostrar el error exacto y detener
 8. Si no se puede resolver el `REPO` automáticamente (Paso 0), detener con error explícito (`"No se pudo inferir el repositorio. Reinvocar como /pr-review {repo}#{N} o {URL_PR}."`). **No preguntar interactivamente** — la skill es autónoma.
 9. **Sin sesgo de memoria** — el análisis se basa exclusivamente en el diff y los datos de la API obtenidos en esta sesión. No usar información de sesiones previas, reviews anteriores al mismo PR, ni conocimiento previo sobre el repositorio o sus autores. Ver la Regla de Aislamiento al inicio del documento.
+10. **Identidad bot obligatoria en publicación** — antes de cualquier `gh pr review`, `gh pr comment`, `gh api .../reviews`, `gh api .../comments` o `gh api .../dismissals`, ejecutar el Paso 2.6 para cargar `BOT_TOKEN` de la GitHub App `olimpus-hermes-bot[bot]`. Pasarlo INLINE en cada `gh` para que pise el keyring. Si bot-token.sh falla, el flujo continúa con identidad humana y un WARNING visible — nunca abortar.
