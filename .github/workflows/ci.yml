@@ -69,7 +69,7 @@ jobs:
           echo "→ Reemplazar con: pytest --cov / go test -cover / jest --coverage"
 
       - name: Subir cobertura a Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
