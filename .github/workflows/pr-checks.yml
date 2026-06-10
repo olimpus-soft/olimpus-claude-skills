@@ -9,13 +9,31 @@ on:
     branches: [main, develop]
     types: [opened, synchronize, reopened, edited]
 
+# OLIMPUSSW-427: Patrón de ramas de bots conocidos.
+# Para añadir un bot nuevo: extender la alternación del regex (ej: |renovate/|otro-bot/).
+env:
+  BOT_BRANCH_PATTERN: '^(dependabot/|release-please--|renovate/)'
+
 jobs:
   validate:
     name: Validar convenciones del PR
     runs-on: ubuntu-latest
 
     steps:
+      - name: Detectar rama de bot
+        id: bot
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" =~ $BOT_BRANCH_PATTERN ]]; then
+            echo "is_bot=true" >> "$GITHUB_OUTPUT"
+            echo "✓ Rama de bot detectada — se omitirán validaciones de convención humanas para $HEAD_REF"
+          else
+            echo "is_bot=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Validar nombre de rama origen
+        if: steps.bot.outputs.is_bot != 'true'
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
@@ -38,6 +56,7 @@ jobs:
           fi
 
       - name: Validar título del PR (Conventional Commits)
+        if: steps.bot.outputs.is_bot != 'true'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
@@ -61,11 +80,13 @@ jobs:
           fi
 
       - name: Checkout código
+        if: steps.bot.outputs.is_bot != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Verificar cambios en CHANGELOG.md
+        if: steps.bot.outputs.is_bot != 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
