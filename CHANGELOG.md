@@ -14,6 +14,9 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+- **[OLIMPUSSW-427] `pr-checks.yml` — excepcionar ramas de bots en el validador de convenciones:** los 3 steps de validación (nombre de rama, título Conventional Commits, CHANGELOG.md) ahora hacen early-exit con `exit 0` cuando `$HEAD_REF` matchea `^(dependabot/|release-please--)`. Antes del fix, todo PR de Dependabot fallaba en el primer step porque la rama `dependabot/github_actions/...` no cumple el patrón `^(feature|fix|chore|...)/OLIMPUSSW-[0-9]+`. Caso real: Dependabot PR#8 (bump `github-actions` group con 11 updates) bloqueado en CI. El fix permite que los PRs automáticos avancen sin diluir la validación para ramas humanas.
+
 ### Changed
 - **[OLIMPUSSW-445] `backport.yml` — App token `olimpus-hermes-bot` para commits Verified:** sustituye `secrets.BACKPORT_TOKEN` (PAT) por installation token vía `actions/create-github-app-token@v3` con `BOT_APP_ID` + `BOT_APP_PRIVATE_KEY` en ambos jobs (`develop_to_main` y `main_to_develop`). Los commits del backport ahora salen como `olimpus-hermes-bot[bot]` con badge **Verified** — cumple `required_signatures` del ruleset `main`. Copia literal del template `olimpus-soft/olimpuss-template@HEAD` (batch-4 cross-repo).
 
