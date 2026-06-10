@@ -9,23 +9,35 @@ on:
     branches: [main, develop]
     types: [opened, synchronize, reopened, edited]
 
+# OLIMPUSSW-427: Patrón de ramas de bots conocidos.
+# Para añadir un bot nuevo: extender la alternación del regex (ej: |renovate/|otro-bot/).
+env:
+  BOT_BRANCH_PATTERN: '^(dependabot/|release-please--|renovate/)'
+
 jobs:
   validate:
     name: Validar convenciones del PR
     runs-on: ubuntu-latest
 
     steps:
+      - name: Detectar rama de bot
+        id: bot
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" =~ $BOT_BRANCH_PATTERN ]]; then
+            echo "is_bot=true" >> "$GITHUB_OUTPUT"
+            echo "✓ Rama de bot detectada — se omitirán validaciones de convención humanas para $HEAD_REF"
+          else
+            echo "is_bot=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Validar nombre de rama origen
+        if: steps.bot.outputs.is_bot != 'true'
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
           echo "Rama origen: $HEAD_REF"
-
-          # OLIMPUSSW-427: excepcionar ramas de bots que no siguen el patrón OLIMPUSSW
-          if [[ "$HEAD_REF" =~ ^(dependabot/|release-please--) ]]; then
-            echo "✓ Rama de bot detectada — se omite el patrón OLIMPUSSW para $HEAD_REF"
-            exit 0
-          fi
 
           VALID_PREFIXES="^(feature|fix|bugfix|bug|chore|docs|release|hotfix)\/OLIMPUSSW-[0-9]+"
 
@@ -44,17 +56,11 @@ jobs:
           fi
 
       - name: Validar título del PR (Conventional Commits)
+        if: steps.bot.outputs.is_bot != 'true'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-          HEAD_REF: ${{ github.head_ref }}
         run: |
           echo "Título del PR: $PR_TITLE"
-
-          # OLIMPUSSW-427: bots ya validan título via sus propios formats (deps, release)
-          if [[ "$HEAD_REF" =~ ^(dependabot/|release-please--) ]]; then
-            echo "✓ Rama de bot — se omite validación de título"
-            exit 0
-          fi
 
           VALID_TYPES="feat|fix|chore|docs|refactor|test|ci|build|perf|hotfix|release"
           PATTERN="^($VALID_TYPES)(\(.+\))?: .{10,}"
@@ -74,22 +80,17 @@ jobs:
           fi
 
       - name: Checkout código
+        if: steps.bot.outputs.is_bot != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Verificar cambios en CHANGELOG.md
+        if: steps.bot.outputs.is_bot != 'true'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REF: ${{ github.head_ref }}
         run: |
-          # OLIMPUSSW-427: bots de dependencias/release no tocan CHANGELOG manualmente
-          if [[ "$HEAD_REF" =~ ^(dependabot/|release-please--) ]]; then
-            echo "✓ Rama de bot — se omite chequeo de CHANGELOG.md"
-            exit 0
-          fi
-
           CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -c "^CHANGELOG.md$" || true)
 
           if [ "$CHANGED" -gt 0 ]; then
