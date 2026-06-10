@@ -28,6 +28,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.base.ref || inputs.mode || github.ref }}
@@ -47,17 +48,27 @@ jobs:
       }}
 
     steps:
+      # OLIMPUSSW-445: usar installation token de App olimpus-hermes-bot.
+      # GitHub firma como Verified los commits hechos con installation tokens.
+      - name: Generate App token (olimpus-hermes-bot)
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+
       - name: Checkout develop
         uses: actions/checkout@v6
         with:
           ref: develop
           fetch-depth: 0
-          token: ${{ secrets.BACKPORT_TOKEN }}
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: true
 
-      - name: Configure git
+      - name: Configure git as olimpus-hermes-bot
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "olimpus-hermes-bot[bot]"
+          git config user.email "${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com"
 
       - name: Resolve source branch
         id: source
@@ -84,7 +95,11 @@ jobs:
       - name: Open PR to develop
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.BACKPORT_TOKEN }}
+          # Token de la App → commits salen como olimpus-hermes-bot[bot] Verified
+          # (cumple required_signatures del ruleset develop).
+          token: ${{ steps.app.outputs.token }}
+          committer: "olimpus-hermes-bot[bot] <${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com>"
+          author: "olimpus-hermes-bot[bot] <${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com>"
           branch: chore/backport-${{ steps.source.outputs.branch }}-to-develop
           base: develop
           title: "chore(backport): ${{ steps.source.outputs.branch }} → develop"
@@ -95,6 +110,7 @@ jobs:
             SHA: `${{ github.sha }}`
 
             > Este PR mantiene `develop` alineada con lo que ya fue promovido a producción.
+            > Commits firmados con installation token de la App `olimpus-hermes-bot` (Verified).
           labels: |
             backport
             automated
@@ -113,30 +129,29 @@ jobs:
       }}
 
     steps:
-      - name: Install GitHub CLI
-        run: |
-          archive="$RUNNER_TEMP/gh.tar.gz"
-          curl -fsSL https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_amd64.tar.gz -o "$archive"
-          echo "02d1290eba130e0b896f3709ffff22e1c75a51475ddb70476a85abc6b5807af0  $archive" | sha256sum -c -
-          tar -xzf "$archive" -C "$RUNNER_TEMP"
-          mkdir -p "$RUNNER_TEMP/bin"
-          cp "$RUNNER_TEMP/gh_2.93.0_linux_amd64/bin/gh" "$RUNNER_TEMP/bin/gh"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # OLIMPUSSW-445: idem main_to_develop — App token para que commits salgan Verified.
+      - name: Generate App token (olimpus-hermes-bot)
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
 
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          token: ${{ secrets.BACKPORT_TOKEN }}
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: true
 
-      - name: Configure git
+      - name: Configure git as olimpus-hermes-bot
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "olimpus-hermes-bot[bot]"
+          git config user.email "${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com"
 
       - name: Create PRs from develop to feature branches
         env:
-          GH_TOKEN: ${{ secrets.BACKPORT_TOKEN }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           REPO: ${{ github.repository }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
@@ -198,7 +213,7 @@ jobs:
               --base "$TARGET_BRANCH" \
               --head "$BACKPORT_BRANCH" \
               --title "chore(backport): develop → ${TARGET_BRANCH}" \
-              --body "Backport automático desde \`develop\` hacia \`${TARGET_BRANCH}\`.\n\nSHA origen: \`${SOURCE_SHA}\`\n\nEste PR permite revisar la sincronización antes de tocar la rama feature." \
+              --body "Backport automático desde \`develop\` hacia \`${TARGET_BRANCH}\`.\n\nSHA origen: \`${SOURCE_SHA}\`\n\nCommits firmados con installation token de App \`olimpus-hermes-bot\` (Verified).\n\nEste PR permite revisar la sincronización antes de tocar la rama feature." \
               --label backport \
               --label automated
 
