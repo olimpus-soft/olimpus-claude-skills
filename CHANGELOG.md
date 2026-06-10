@@ -5,6 +5,13 @@ Todos los cambios notables en este proyecto se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/).
 Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.2.0](https://github.com/olimpus-soft/olimpus-claude-skills/compare/v1.1.2...v1.2.0) (2026-06-10)
+
+
+### Features
+
+* **OLIMPUSSW-438:** propagar 8 workflows canónicos del template a olimpus-claude-skills ([0e8136f](https://github.com/olimpus-soft/olimpus-claude-skills/commit/0e8136fd1b6d62b6e6c7b6f6bc7172a7b2699931))
+
 ## [Unreleased]
 
 ### Added
