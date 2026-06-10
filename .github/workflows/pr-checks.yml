@@ -21,6 +21,12 @@ jobs:
         run: |
           echo "Rama origen: $HEAD_REF"
 
+          # OLIMPUSSW-427: excepcionar ramas de bots que no siguen el patrón OLIMPUSSW
+          if [[ "$HEAD_REF" =~ ^(dependabot/|release-please--) ]]; then
+            echo "✓ Rama de bot detectada — se omite el patrón OLIMPUSSW para $HEAD_REF"
+            exit 0
+          fi
+
           VALID_PREFIXES="^(feature|fix|bugfix|bug|chore|docs|release|hotfix)\/OLIMPUSSW-[0-9]+"
 
           if echo "$HEAD_REF" | grep -qE "$VALID_PREFIXES"; then
@@ -40,8 +46,15 @@ jobs:
       - name: Validar título del PR (Conventional Commits)
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           echo "Título del PR: $PR_TITLE"
+
+          # OLIMPUSSW-427: bots ya validan título via sus propios formats (deps, release)
+          if [[ "$HEAD_REF" =~ ^(dependabot/|release-please--) ]]; then
+            echo "✓ Rama de bot — se omite validación de título"
+            exit 0
+          fi
 
           VALID_TYPES="feat|fix|chore|docs|refactor|test|ci|build|perf|hotfix|release"
           PATTERN="^($VALID_TYPES)(\(.+\))?: .{10,}"
@@ -69,7 +82,14 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
+          # OLIMPUSSW-427: bots de dependencias/release no tocan CHANGELOG manualmente
+          if [[ "$HEAD_REF" =~ ^(dependabot/|release-please--) ]]; then
+            echo "✓ Rama de bot — se omite chequeo de CHANGELOG.md"
+            exit 0
+          fi
+
           CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -c "^CHANGELOG.md$" || true)
 
           if [ "$CHANGED" -gt 0 ]; then
