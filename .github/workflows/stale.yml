@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 8 * * *'
 
+permissions:
+  contents: read
+
 jobs:
   stale:
     runs-on: [self-hosted, linux, x64, vps-ephemeral]

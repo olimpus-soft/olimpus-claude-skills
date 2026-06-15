@@ -5,13 +5,15 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release:
     name: Create Release
     runs-on: [self-hosted, linux, x64, vps-ephemeral]
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -20,7 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create Release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
           # TODO: ajustar release-type al stack del proyecto
           # Opciones: python, go, node, java, simple, etc.

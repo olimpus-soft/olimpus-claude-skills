@@ -26,9 +26,7 @@ on:
           - master
 
 permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.base.ref || inputs.mode || github.ref }}
@@ -39,6 +37,10 @@ jobs:
     name: Backport main/master → develop via PR
     runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
     timeout-minutes: 35
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     if: >-
       ${{
         (github.event_name == 'pull_request' &&
@@ -93,7 +95,7 @@ jobs:
           git merge "origin/${SOURCE_BRANCH}" --no-edit
 
       - name: Open PR to develop
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           # Token de la App → commits salen como olimpus-hermes-bot[bot] Verified
           # (cumple required_signatures del ruleset develop).
@@ -120,6 +122,10 @@ jobs:
     name: Sync develop → feature/* via PRs
     runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
     timeout-minutes: 35
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     if: >-
       ${{
         (github.event_name == 'pull_request' &&
