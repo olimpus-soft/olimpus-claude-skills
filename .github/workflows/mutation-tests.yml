@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   mutation:
     runs-on: [self-hosted, linux, x64, vps-ephemeral-8gb]

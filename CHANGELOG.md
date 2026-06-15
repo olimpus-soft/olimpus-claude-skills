@@ -14,6 +14,14 @@ Versionado siguiendo [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Security
+- **[OLIMPUSSW-495] Workflows: token permissions least-privilege + pin third-party actions a SHA-40.** Mitiga `TokenPermissionsID` y `PinnedDependenciesID` (code-scanning errors detectados en audit cross-repo `agents/shared/decisions/2026-06-15_security-alerts-cross-repo-piccolo.md`). Cambios:
+  - Agregado bloque `permissions: { contents: read }` top-level en `cd.yml`, `ci.yml`, `mutation-tests.yml`, `security.yml`, `stale.yml`, `claude.yml`, `codex-review-gate.yml`.
+  - Bajado `permissions:` top-level a `contents: read` y movido `write` necesario a per-job en `backport.yml`, `release.yml`, `docker-publish.yml` (least-privilege default).
+  - Pinneadas 11 third-party actions a SHA commit completo (40 chars) con comentario semver: `codecov/codecov-action`, `appleboy/ssh-action`, `anthropics/claude-code-action`, `docker/login-action`, `docker/metadata-action`, `docker/setup-buildx-action`, `docker/build-push-action`, `peter-evans/create-pull-request`, `googleapis/release-please-action`, `ossf/scorecard-action`, `aquasecurity/trivy-action`.
+  - Actions oficiales GitHub (`actions/*`, `github/codeql-action/*`) **NO se pinean** por decisión milk — namespace de confianza.
+  - Fuera de scope (ticket separado): `claude.yml` `actions/untrusted-checkout/high` + `DangerousWorkflowID` (patrón `workflow_run` con checkout de PR head_sha — requiere refactor estructural). Dockerfile container image pinning. Meta-checks scorecard sin archivo asociado.
+
 ### Fixed
 - **[OLIMPUSSW-427] `pr-checks.yml` — excepcionar ramas de bots en el validador de convenciones:** los 3 steps de validación (nombre de rama, título Conventional Commits, CHANGELOG.md) ahora hacen early-exit con `exit 0` cuando `$HEAD_REF` matchea `^(dependabot/|release-please--)`. Antes del fix, todo PR de Dependabot fallaba en el primer step porque la rama `dependabot/github_actions/...` no cumple el patrón `^(feature|fix|chore|...)/OLIMPUSSW-[0-9]+`. Caso real: Dependabot PR#8 (bump `github-actions` group con 11 updates) bloqueado en CI. El fix permite que los PRs automáticos avancen sin diluir la validación para ramas humanas.
 
