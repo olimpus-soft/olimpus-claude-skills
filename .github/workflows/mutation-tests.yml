@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # TODO: Configurar setup del stack y herramienta de mutation testing
       # Python — mutmut
