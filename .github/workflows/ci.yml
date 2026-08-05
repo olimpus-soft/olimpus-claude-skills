@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # TODO: Reemplazar los steps de setup, install, lint, test y cobertura
       # según el stack del proyecto. Ver ejemplos en docs/guide/ci.md
@@ -69,7 +69,7 @@ jobs:
           echo "→ Reemplazar con: pytest --cov / go test -cover / jest --coverage"
 
       - name: Subir cobertura a Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           file: ./coverage.xml
           fail_ci_if_error: false
