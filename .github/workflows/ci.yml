@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # TODO: Reemplazar los steps de setup, install, lint, test y cobertura
       # según el stack del proyecto. Ver ejemplos en docs/guide/ci.md
