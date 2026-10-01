@@ -1,12 +1,11 @@
 name: PR Review Gate (Claude)
 
 on:
-  workflow_run:
-    workflows: ["CI", "Bandit — Python Security Analysis", "Trivy — Container Security Scan"]
-    types: [completed]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
-  group: pr-review-${{ github.event.workflow_run.pull_requests[0].number }}
+  group: pr-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -14,9 +13,9 @@ jobs:
     name: PR Review Gate
     # Solo si CI verde + disparado por pull_request (no push directo)
     if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request'
-    runs-on: [self-hosted, linux, x64, vps-ephemeral, ttl-45]
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, linux, x64, vps-permanent]
     timeout-minutes: 25
     permissions:
       contents: read
@@ -24,41 +23,12 @@ jobs:
       id-token: write
 
     steps:
-      # Resuelve PR number y verifica que no sea draft (draft no está en objeto simplificado de workflow_run)
-      - name: Obtener info del PR
-        id: pr-info
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = context.payload.workflow_run.pull_requests?.[0]?.number;
-            if (!prNumber) {
-              core.setOutput('skip', 'true');
-              core.setOutput('pr_number', '');
-              console.log('No PR encontrado en workflow_run — skipping');
-              return;
-            }
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-            });
-            core.setOutput('skip', pr.draft ? 'true' : 'false');
-            core.setOutput('pr_number', String(pr.number));
-            console.log(`PR #${pr.number} | draft=${pr.draft}`);
-
-      - name: Saltar si PR en draft o no encontrado
-        if: steps.pr-info.outputs.skip == 'true'
-        run: |
-          echo "PR en draft o no encontrado — review omitido"
-          exit 0
-
       # Token efímero del GitHub App olimpus-hermes-bot — permite que los
       # `gh pr review/comment/approve` del skill (Bash heredado dentro del
       # action) se firmen como `olimpus-hermes-bot[bot]` en lugar del
       # actor que disparó el workflow.
       - name: Generar token GitHub App (olimpus-hermes-bot)
         id: bot
-        if: steps.pr-info.outputs.skip == 'false'
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
@@ -66,12 +36,10 @@ jobs:
           owner: ${{ github.repository_owner }}
 
       - uses: actions/checkout@v4
-        if: steps.pr-info.outputs.skip == 'false'
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Claude — Revisión de PR
-        if: steps.pr-info.outputs.skip == 'false'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -89,7 +57,7 @@ jobs:
             Publica la review formal usando el CLI `gh` con `GH_TOKEN`, para que `olimpus-hermes-bot[bot]` quede siempre como reviewer formal. Mantén activa la coexistencia con `claude[bot]` y `chatgpt-codex-connector[bot]`: cualquiera de los tres puede dejar evidencia, pero Hermes debe intentar firmar la revisión.
 
 
-            1. `/pr-review-toolkit:pr-review ${{ github.repository }}#${{ steps.pr-info.outputs.pr_number }}`
+            1. `/pr-review-toolkit:pr-review ${{ github.repository }}#${{ github.event.pull_request.number }}`
             2. `/pr-review-toolkit:quality-test`
 
             El plugin `pr-review-toolkit` ya quedó instalado por el action vía `plugins:` — invocá directo las skills namespaced. NO agrupar los dos slash commands en un mismo mensaje (sólo el primer `/` se interpreta como comando, el resto queda como argumento). Tras terminar, cierra con `/pr-review-toolkit:pr-comments-resolver` o el Paso 6 desbloqueo del propio pr-review si aplica.
@@ -112,11 +80,10 @@ jobs:
       # head SHA del PR. Evita "verdes silenciosos" como el que sufrió el
       # patrón anterior (slash-commands-en-prompt sin instalar nada).
       - name: Verify Claude review ran
-        if: steps.pr-info.outputs.skip == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           # Filtro defensivo: en olimpus-auth coexisten tres reviewers
