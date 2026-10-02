@@ -16,7 +16,7 @@ jobs:
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, linux, x64, vps-permanent]
-    timeout-minutes: 10
+    timeout-minutes: ${{ fromJSON(vars.GATE_TIMEOUT_MIN || '15') }}
     permissions:
       contents: read
       pull-requests: write
