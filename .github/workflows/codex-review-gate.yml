@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Generar token GitHub App (olimpus-hermes-bot)
         id: bot
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
@@ -36,7 +36,7 @@ jobs:
       # Resuelve PR number y verifica que no sea draft
       - name: Obtener info del PR
         id: pr-info
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             await github.rest.repos.createCommitStatus({
